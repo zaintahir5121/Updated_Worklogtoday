@@ -214,6 +214,12 @@ table.t tbody tr:hover { background:var(--soft); }
 /* ── Table scroll on mobile ── */
 .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
 
+/* ── Bottom nav (mobile only, hidden on desktop) ── */
+.bottom-nav { display:none; }
+
+/* ── FAB (mobile only) ── */
+.fab { display:none; }
+
 /* ── Mobile app shell ── */
 @media (max-width: 900px) {
     .features, .steps, .board-preview { grid-template-columns: 1fr 1fr; }
@@ -224,24 +230,183 @@ table.t tbody tr:hover { background:var(--soft); }
     .app-search { order:3; flex:0 0 100%; min-width:0; }
     .user-name-wrap { display:none; }
 }
+
 @media (max-width: 640px) {
+    /* Landing */
     .features, .steps, .board-preview { grid-template-columns: 1fr; }
-    .stat-grid { grid-template-columns: 1fr 1fr; }
-    .masonry { columns: 1; }
-    .hide-mobile { display:none !important; }
-    .app-tabs { gap:0; }
-    .app-tab { padding:10px 8px; font-size:13px; gap:4px; }
-    .btn-label { display:none; }
-    .tab-label { display:none; }
-    .app-top .inner { padding:10px 12px; }
-    .app-body { padding:12px; }
-    .modal { border-radius:16px 16px 0 0; position:fixed; bottom:0; left:0; right:0; max-width:100% !important; }
-    .modal-bg { align-items:flex-end; padding:0; }
-    .mb .row2 { grid-template-columns: 1fr; }
-    .weeknav strong { font-size:13px; }
     .hero h1 { font-size:clamp(28px, 8vw, 48px); }
     .lp-nav .links a:not(.btn) { display:none; }
+
+    /* Hide desktop tabs — replaced by bottom nav */
+    .app-tabs { display:none; }
+
+    /* App top bar — compact Keep-style */
+    .app-top { position:fixed; top:0; left:0; right:0; z-index:40; }
+    .app-top .inner {
+        padding:0 12px;
+        height:56px;
+        gap:8px;
+    }
+    .app-top .logo { font-size:16px; }
+    .app-top .logo .mark { width:28px; height:28px; font-size:14px; }
+    .app-search {
+        order:0;
+        flex:1;
+        min-width:0;
+        padding:8px 12px;
+        border-radius:24px;
+        background:#f1f3f4;
+        border-color:transparent;
+        height:40px;
+    }
+    .app-search input { font-size:14px; }
+    .bmc-btn { display:none; }
+    .hide-mobile { display:none !important; }
+    .btn-label { display:none; }
+    .tab-label { display:none; }
+
+    /* Body — space for fixed top bar + bottom nav */
+    .app-body {
+        padding: 72px 12px 88px;
+        max-width:100%;
+    }
+
+    /* ── Notes tab — Keep-style 2-col masonry ── */
+    .masonry { columns: 2; column-gap:10px; }
+    .note {
+        margin-bottom:10px;
+        border-radius:10px;
+        padding:12px;
+        border:1px solid rgba(0,0,0,.1);
+        box-shadow:none;
+        break-inside:avoid;
+    }
+    .note h4 { font-size:13.5px; margin-bottom:4px; }
+    .note .ntext { font-size:12.5px; line-height:1.4; }
+    .note .nlabels { margin-top:8px; gap:4px; }
+    .note .nlabel { font-size:10px; padding:2px 7px; }
+    /* Always show note actions on mobile (no hover) */
+    .note .nactions { opacity:1; margin-top:8px; }
+    .note .pin { opacity:1; }
+    .mini-btn { width:26px; height:26px; font-size:13px; }
+
+    /* Composer — collapsed by default, full width */
+    .composer {
+        max-width:100%;
+        margin:0 0 16px;
+        border-radius:24px;
+        border:1px solid rgba(0,0,0,.12);
+        box-shadow: 0 1px 3px rgba(0,0,0,.1);
+        padding:12px 16px;
+    }
+    .composer.expanded { border-radius:12px; }
+    .composer .cbody { font-size:14px; }
+    .notes-section-label { font-size:10px; margin:4px 2px 10px; }
+
+    /* ── Tasks / Timesheet / Reports ── */
+    .stat-grid { grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:16px; }
+    .stat { padding:14px 12px; border-radius:12px; }
+    .stat .v { font-size:22px; }
+    .stat .l { font-size:12px; }
+    .card { border-radius:12px; }
+    .card .hd { padding:12px 14px; font-size:14px; flex-wrap:wrap; gap:8px; }
+    .card .bd { padding:4px 0; }
+    table.t th { font-size:10px; padding:9px 10px; }
+    table.t td { padding:9px 10px; font-size:13px; }
+    .weeknav strong { font-size:13px; }
+    .ai-panel { padding:14px; border-radius:12px; }
+    .ai-out { font-size:13.5px; }
+
+    /* ── Modals → bottom sheets ── */
+    .modal {
+        border-radius:20px 20px 0 0;
+        position:fixed;
+        bottom:0; left:0; right:0;
+        max-width:100% !important;
+        max-height:92vh;
+        overflow-y:auto;
+    }
+    .modal-bg { align-items:flex-end; padding:0; }
+    .modal .mh { padding:16px 18px; font-size:15px; }
+    .modal .mb { padding:16px 18px; }
+    .modal .mf { padding:12px 18px; }
+    .mb .row2 { grid-template-columns: 1fr; }
+
+    /* Toast above bottom nav */
+    .toast { bottom:80px; }
+
+    /* ── Bottom navigation bar (Google Keep style) ── */
+    .bottom-nav {
+        display:flex;
+        position:fixed;
+        bottom:0; left:0; right:0;
+        height:64px;
+        background:#fff;
+        border-top:1px solid var(--line);
+        z-index:50;
+        align-items:stretch;
+        box-shadow:0 -2px 8px rgba(0,0,0,.08);
+        padding-bottom:env(safe-area-inset-bottom);
+    }
+    .bottom-nav-item {
+        flex:1;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:3px;
+        border:none;
+        background:transparent;
+        cursor:pointer;
+        color:var(--muted);
+        font-size:10px;
+        font-weight:600;
+        font-family:inherit;
+        padding:6px 0;
+        position:relative;
+        transition:.15s;
+        -webkit-tap-highlight-color:transparent;
+    }
+    .bottom-nav-item i { font-size:22px; transition:.15s; }
+    .bottom-nav-item.active { color:var(--amber-2); }
+    .bottom-nav-item.active i { font-size:24px; }
+    .bottom-nav-item.active::after {
+        content:'';
+        position:absolute;
+        top:0; left:20%; right:20%;
+        height:3px;
+        background:linear-gradient(90deg,var(--amber),var(--amber-2));
+        border-radius:0 0 3px 3px;
+    }
+
+    /* ── FAB (floating action button) ── */
+    .fab {
+        display:flex;
+        position:fixed;
+        bottom:76px;
+        right:18px;
+        width:56px; height:56px;
+        border-radius:16px;
+        background:linear-gradient(135deg,var(--amber),var(--amber-2));
+        color:#fff;
+        border:none;
+        font-size:26px;
+        align-items:center;
+        justify-content:center;
+        box-shadow:0 4px 16px rgba(245,158,11,.5);
+        cursor:pointer;
+        z-index:49;
+        transition:.2s;
+        -webkit-tap-highlight-color:transparent;
+    }
+    .fab:active { transform:scale(.93); }
+
+    /* Task action buttons row */
+    #pane-tasks > div:first-child { flex-direction:column; align-items:stretch; gap:8px; margin-bottom:14px; }
+    #pane-tasks > div:first-child > div { overflow-x:auto; }
+    #pane-tasks > div:first-child > div:last-child { display:flex; gap:8px; flex-wrap:wrap; }
 }
+
 
 /* ── Legal pages (Privacy / Terms) ── */
 .legal-page { background:var(--bg); min-height:100vh; padding-bottom:60px; }

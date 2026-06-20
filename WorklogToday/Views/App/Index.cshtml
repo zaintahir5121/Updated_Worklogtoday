@@ -374,6 +374,29 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Mobile bottom navigation (hidden on desktop via CSS) -->
+<nav class="bottom-nav" id="bottomNav">
+    <button class="bottom-nav-item active" data-tab="notes" type="button">
+        <i class="bi bi-lightbulb"></i>
+        Notes
+    </button>
+    <button class="bottom-nav-item" data-tab="tasks" type="button">
+        <i class="bi bi-list-check"></i>
+        Tasks
+    </button>
+    <button class="bottom-nav-item" data-tab="timesheet" type="button">
+        <i class="bi bi-calendar-week"></i>
+        Time
+    </button>
+    <button class="bottom-nav-item" data-tab="reports" type="button">
+        <i class="bi bi-bar-chart"></i>
+        Reports
+    </button>
+</nav>
+
+<!-- Mobile FAB -->
+<button class="fab" id="mobileFab" type="button" title="New note"><i class="bi bi-plus"></i></button>
+
 @section Scripts {
     <script src="~/js/app.js" asp-append-version="true"></script>
 }

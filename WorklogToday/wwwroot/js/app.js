@@ -30,14 +30,34 @@
     // ---------- Tabs ----------
     function activateTab(name) {
         $$('.app-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+        $$('.bottom-nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
         $$('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + name));
         localStorage.setItem('wt_tab', name);
         if (name === 'reports') loadReports();
+        // FAB: show on notes, hide on others
+        const fab = $('#mobileFab');
+        if (fab) fab.style.display = name === 'notes' ? '' : 'none';
     }
     $$('.app-tab').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
+    $$('.bottom-nav-item').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
     const urlTab = new URLSearchParams(location.search).get('tab');
     const savedTab = urlTab || localStorage.getItem('wt_tab');
     if (savedTab && $('#pane-' + savedTab)) activateTab(savedTab);
+
+    // ---------- Mobile FAB ----------
+    const mobileFab = $('#mobileFab');
+    if (mobileFab) {
+        mobileFab.addEventListener('click', () => {
+            // Expand the composer and focus it
+            const composer = $('#composer');
+            const body = $('#cBody');
+            if (composer && body) {
+                composer.classList.add('expanded');
+                body.focus();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+    }
 
     // ---------- PWA install ----------
     let deferredPrompt = null;
