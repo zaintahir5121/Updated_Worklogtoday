@@ -1,0 +1,104 @@
+@{
+    ViewData["Title"] = "Terms of Service · worklog.today";
+    ViewData["Description"] = "Terms of Service for worklog.today — the rules for using the app.";
+    var baseUrl = (Context.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration)?["Site:BaseUrl"]
+        ?? $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var updated = "June 20, 2025";
+}
+@section Head {
+    <link rel="canonical" href="@baseUrl/terms" />
+    <meta name="robots" content="index,follow" />
+}
+
+<nav class="lp-nav">
+    <div class="container inner">
+        <a class="logo" href="/"><span class="mark"><i class="bi bi-journal-text"></i></span>worklog<span class="dot">.today</span></a>
+        <div class="links">
+            <a class="nav-text" href="/#features">Features</a>
+            <a class="nav-text" asp-controller="Account" asp-action="Login">Sign in</a>
+            <a class="btn btn-amber btn-sm" asp-controller="Account" asp-action="Register">Get started free</a>
+        </div>
+    </div>
+</nav>
+
+<div class="legal-page">
+    <div class="container legal-container">
+        <h1>Terms of Service</h1>
+        <p class="legal-meta">Last updated: @updated</p>
+
+        <p>These Terms of Service ("Terms") govern your access to and use of worklog.today ("Service"), operated by Zain Tahir ("we", "us", or "our"). By creating an account or using the Service in any way, you agree to be bound by these Terms. If you do not agree, do not use the Service.</p>
+
+        <h2>1. Eligibility</h2>
+        <p>You must be at least 13 years old to use the Service. By using the Service, you represent that you meet this requirement and that the information you provide is accurate and complete. If you are using the Service on behalf of a company or organisation, you represent that you have authority to bind that entity to these Terms.</p>
+
+        <h2>2. Your Account</h2>
+        <p>You are responsible for:</p>
+        <ul>
+            <li>Maintaining the confidentiality of your password and account credentials.</li>
+            <li>All activity that occurs under your account.</li>
+            <li>Notifying us immediately at <a href="mailto:zain.tahir512@gmail.com">zain.tahir512&#64;gmail.com</a> of any unauthorised use of your account.</li>
+        </ul>
+        <p>We reserve the right to terminate accounts that violate these Terms.</p>
+
+        <h2>3. Acceptable Use</h2>
+        <p>You agree not to use the Service to:</p>
+        <ul>
+            <li>Violate any applicable law or regulation.</li>
+            <li>Upload, transmit or distribute malicious code, viruses, or harmful content.</li>
+            <li>Attempt to gain unauthorised access to the Service, other users' accounts, or our infrastructure.</li>
+            <li>Scrape, crawl, or otherwise automate access to the Service without our written consent.</li>
+            <li>Use the Service to store, process, or transmit highly sensitive personal data of third parties (e.g. financial data, health records) unless you are solely responsible for ensuring compliance with applicable laws.</li>
+            <li>Impersonate any person or entity.</li>
+            <li>Interfere with the operation of the Service.</li>
+        </ul>
+
+        <h2>4. Your Content</h2>
+        <p>You retain ownership of all notes, tasks, and other content you create in the Service ("User Content"). By using the Service, you grant us a limited, non-exclusive licence to store and process your User Content solely to provide the Service to you.</p>
+        <p>You are solely responsible for your User Content. We do not review User Content and make no representations about its accuracy or legality. You represent that your User Content does not infringe any third-party intellectual property rights.</p>
+
+        <h2>5. AI Features</h2>
+        <p>The Service includes AI-powered features that process your content to generate summaries, suggestions, and reports. These features are provided "as is" — AI output may be inaccurate, incomplete, or inappropriate for your specific context. You are responsible for reviewing and verifying any AI-generated content before using it professionally or sharing it with others.</p>
+
+        <h2>6. Intellectual Property</h2>
+        <p>The Service, including its design, code, branding, and original content, is owned by Zain Tahir and protected by applicable intellectual property laws. You may not copy, modify, distribute, or create derivative works of the Service without our express written permission.</p>
+
+        <h2>7. Third-Party Services</h2>
+        <p>The Service integrates with third-party services, including Google Sign-In and Google AdSense. Your use of those services is governed by their respective terms and privacy policies. We are not responsible for the content, practices, or policies of third-party services.</p>
+
+        <h2>8. Advertisements</h2>
+        <p>The Service may display advertisements on public-facing pages, served by Google AdSense. Advertisements are not shown to authenticated users inside the application workspace. We do not endorse any advertised products or services.</p>
+
+        <h2>9. Disclaimer of Warranties</h2>
+        <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, OR UNINTERRUPTED OR ERROR-FREE OPERATION. WE DO NOT WARRANT THAT THE SERVICE WILL MEET YOUR REQUIREMENTS OR THAT DATA WILL NOT BE LOST.</p>
+
+        <h2>10. Limitation of Liability</h2>
+        <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, WE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR DATA, ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF THE SERVICE, EVEN IF WE HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. OUR TOTAL LIABILITY TO YOU FOR ALL CLAIMS SHALL NOT EXCEED THE AMOUNT YOU PAID US IN THE TWELVE MONTHS PRECEDING THE CLAIM (OR USD $10 IF YOU HAVE NOT PAID ANYTHING).</p>
+
+        <h2>11. Indemnification</h2>
+        <p>You agree to indemnify, defend, and hold harmless Zain Tahir and his affiliates, officers, agents, and employees from any claims, liabilities, damages, losses, and expenses (including reasonable legal fees) arising out of your use of the Service, your User Content, or your violation of these Terms.</p>
+
+        <h2>12. Termination</h2>
+        <p>We reserve the right to suspend or terminate your account at any time, with or without notice, for any reason, including violation of these Terms. You may close your account at any time by contacting us. Upon termination, your right to use the Service ceases and we may delete your data in accordance with our Privacy Policy.</p>
+
+        <h2>13. Changes to Terms</h2>
+        <p>We may update these Terms at any time. We will notify you of material changes by updating the "Last updated" date above and, where appropriate, by email. Continued use of the Service after changes are posted constitutes your acceptance of the revised Terms.</p>
+
+        <h2>14. Governing Law</h2>
+        <p>These Terms are governed by and construed in accordance with the laws of the jurisdiction in which Zain Tahir is based, without regard to conflict of law principles. Any disputes shall be resolved in the courts of that jurisdiction.</p>
+
+        <h2>15. Contact</h2>
+        <p>If you have questions about these Terms, please contact us:</p>
+        <ul>
+            <li>Email: <a href="mailto:zain.tahir512@gmail.com">zain.tahir512&#64;gmail.com</a></li>
+            <li>Website: <a href="@baseUrl">@baseUrl</a></li>
+        </ul>
+    </div>
+</div>
+
+<footer>
+    <div class="container lp-foot">
+        <div class="logo" style="font-size:17px"><span class="mark" style="width:28px;height:28px;font-size:14px"><i class="bi bi-journal-text"></i></span>worklog<span class="dot">.today</span></div>
+        <div>© @DateTime.UtcNow.Year worklog.today · <a href="/privacy" style="color:inherit">Privacy</a> · <a href="/terms" style="color:inherit">Terms</a></div>
+        <a class="bmc-link" href="https://buymeacoffee.com/zaintahir512" target="_blank" rel="noopener"><i class="bi bi-cup-hot-fill"></i> Buy me a coffee</a>
+    </div>
+</footer>

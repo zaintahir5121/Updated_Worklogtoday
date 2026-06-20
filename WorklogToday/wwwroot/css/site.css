@@ -242,3 +242,15 @@ table.t tbody tr:hover { background:var(--soft); }
     .hero h1 { font-size:clamp(28px, 8vw, 48px); }
     .lp-nav .links a:not(.btn) { display:none; }
 }
+
+/* ── Legal pages (Privacy / Terms) ── */
+.legal-page { background:var(--bg); min-height:100vh; padding-bottom:60px; }
+.legal-container { max-width:760px; padding:48px 20px; }
+.legal-container h1 { font-size:2rem; font-weight:800; margin-bottom:6px; }
+.legal-meta { color:var(--muted); font-size:13.5px; margin-bottom:32px; }
+.legal-container h2 { font-size:1.15rem; font-weight:700; margin:32px 0 10px; }
+.legal-container h3 { font-size:1rem; font-weight:600; margin:20px 0 8px; }
+.legal-container p, .legal-container li { font-size:14.5px; line-height:1.75; color:#374151; }
+.legal-container ul { padding-left:22px; margin:10px 0 16px; }
+.legal-container li { margin-bottom:6px; }
+.legal-container a { color:var(--amber); }

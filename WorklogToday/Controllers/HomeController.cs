@@ -43,9 +43,17 @@ public class HomeController : Controller
   <url><loc>{baseUrl}/</loc><lastmod>{today}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>{baseUrl}/Account/Register</loc><lastmod>{today}</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>{baseUrl}/Account/Login</loc><lastmod>{today}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>{baseUrl}/privacy</loc><lastmod>{today}</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>{baseUrl}/terms</loc><lastmod>{today}</lastmod><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>";
         return Content(xml, "application/xml");
     }
+
+    [Route("privacy")]
+    public IActionResult Privacy() => View();
+
+    [Route("terms")]
+    public IActionResult Terms() => View();
 
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error() =>
