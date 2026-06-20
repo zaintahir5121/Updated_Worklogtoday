@@ -98,6 +98,28 @@ public class WorkApiController : ControllerBase
         return Ok(new { text = result.Text, source = result.Source, hours = entries.Sum(e => e.Hours), count = entries.Count });
     }
 
+    [HttpGet("standup")]
+    public async Task<IActionResult> Standup(CancellationToken ct)
+    {
+        var today = DateTime.UtcNow.Date;
+        var since = today.AddDays(-3);
+        var entries = await _db.WorkEntries
+            .Where(w => w.UserId == Uid && w.Date >= since && w.Date <= today)
+            .OrderBy(w => w.Date).ToListAsync();
+        var result = await _ai.GenerateStandupAsync(entries, ct);
+        return Ok(new { text = result.Text, source = result.Source });
+    }
+
+    [HttpPost("suggest")]
+    public async Task<IActionResult> Suggest([FromBody] SuggestDto dto, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Task)) return BadRequest(new { error = "Task required." });
+        var result = await _ai.SuggestTaskDetailsAsync(dto.Task, ct);
+        return Ok(new { category = result.Category, hours = result.Hours, source = result.Source });
+    }
+
+    public record SuggestDto(string Task);
+
     [HttpGet("report")]
     public async Task<IActionResult> Report(string from, string to)
     {

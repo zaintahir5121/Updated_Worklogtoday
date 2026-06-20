@@ -22,9 +22,9 @@
     }
 
     let toastT;
-    function toast(msg) {
+    function toast(msg, dur = 2200) {
         const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-        clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200);
+        clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), dur);
     }
 
     // ---------- Tabs ----------
@@ -52,7 +52,7 @@
         await deferredPrompt.userChoice;
         deferredPrompt = null; installBtn.style.display = 'none';
     });
-    window.addEventListener('appinstalled', () => { if (installBtn) installBtn.style.display = 'none'; toast('Installed! Find worklog on your desktop.'); });
+    window.addEventListener('appinstalled', () => { if (installBtn) installBtn.style.display = 'none'; toast('Installed! Find worklog on your home screen.'); });
 
     // ---------- Composer ----------
     const composer = $('#composer'), cTitle = $('#cTitle'), cBody = $('#cBody'), cLabels = $('#cLabels');
@@ -76,7 +76,7 @@
         const btn = $('#aiLabelBtn'); btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> …';
         try {
             const r = await api('POST', '/api/notes/suggest-labels', { title: cTitle.value, content: cBody.value });
-            cLabels.value = r.labels; toast('AI tags via ' + r.source);
+            cLabels.value = r.labels; toast('Smart AI tagged your note');
         } catch (e) { toast(e.message); }
         finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-magic"></i> AI tags'; }
     });
@@ -105,6 +105,7 @@
           <div class="nactions">
             <button class="mini-btn" type="button" data-act="popout" title="Pop out as desktop sticky"><i class="bi bi-window-stack"></i></button>
             <button class="mini-btn" type="button" data-act="edit" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="mini-btn" type="button" data-act="extract" title="Extract tasks with Smart AI"><i class="bi bi-list-task"></i></button>
             <button class="mini-btn" type="button" data-act="archive" title="Archive"><i class="bi bi-archive"></i></button>
             <button class="mini-btn" type="button" data-act="delete" title="Delete"><i class="bi bi-trash"></i></button>
           </div>`;
@@ -151,6 +152,8 @@
                 openSticky(id);
             } else if (act === 'edit') {
                 openNoteModal(card);
+            } else if (act === 'extract') {
+                openExtractModal(id, btn);
             }
         } catch (err) { toast(err.message); }
     });
@@ -173,6 +176,65 @@
             card.replaceWith(fresh);
             noteModal.classList.remove('open'); toast('Saved');
         } catch (e) { toast(e.message); }
+    });
+
+    // ---------- Smart AI: Extract tasks from note ----------
+    const extractModal = $('#extractModal');
+    let extractedTasks = [];
+
+    async function openExtractModal(noteId, triggerBtn) {
+        const origHtml = triggerBtn.innerHTML;
+        triggerBtn.disabled = true; triggerBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        $('#extractList').innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)"><i class="bi bi-cpu" style="font-size:24px;display:block;margin-bottom:8px"></i>Smart AI is reading your note…</div>';
+        extractModal.classList.add('open');
+        try {
+            const r = await api('POST', `/api/notes/${noteId}/extract-tasks`);
+            extractedTasks = r.tasks || [];
+            if (!extractedTasks.length) {
+                $('#extractList').innerHTML = '<div class="empty"><p>No clear action items found. Try adding more specific tasks to your note.</p></div>';
+                return;
+            }
+            $('#extractList').innerHTML = extractedTasks.map((t, i) => `
+              <label class="extract-item" style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
+                <input type="checkbox" checked data-idx="${i}" style="margin-top:3px;width:15px;height:15px;flex-shrink:0" />
+                <div style="flex:1">
+                  <div style="font-weight:600;font-size:14px">${esc(t.task)}</div>
+                  <div style="font-size:12px;color:var(--muted);margin-top:2px">${CAT[t.category] || 'Development'} · ${t.hours}h</div>
+                </div>
+              </label>`).join('');
+        } catch (err) {
+            $('#extractList').innerHTML = `<div class="empty"><p>⚠ ${esc(err.message)}</p></div>`;
+        } finally {
+            triggerBtn.disabled = false; triggerBtn.innerHTML = origHtml;
+        }
+    }
+
+    $('#addExtractedBtn').addEventListener('click', async () => {
+        const checked = $$('#extractList input[type=checkbox]:checked');
+        if (!checked.length) return toast('Select at least one task');
+        const btn = $('#addExtractedBtn'); btn.disabled = true;
+        let added = 0;
+        for (const cb of checked) {
+            const t = extractedTasks[+cb.dataset.idx];
+            if (!t) continue;
+            try {
+                const w = await api('POST', '/api/work', {
+                    task: t.task, project: '', category: t.category, status: 2,
+                    hours: t.hours, date: RANGE.today, billable: true, notes: null
+                });
+                if (w.date >= RANGE.from && w.date <= RANGE.to) {
+                    const tr = document.createElement('tr');
+                    setRowData(tr, w);
+                    $('#taskBody').append(tr);
+                }
+                added++;
+            } catch { /* skip failed items */ }
+        }
+        taskEmptyCheck();
+        extractModal.classList.remove('open');
+        btn.disabled = false;
+        toast(`${added} task${added !== 1 ? 's' : ''} added to your log`);
+        activateTab('tasks');
     });
 
     // ---------- Sticky pop-out windows ----------
@@ -223,8 +285,8 @@
     function rowHtml(w) {
         return `<td>${fmtDate(w.date)}</td>
             <td><strong>${esc(w.task)}</strong>${w.billable ? '' : ' <span class="pill p-other" style="font-size:10px">non-billable</span>'}</td>
-            <td>${esc(w.project) || '—'}</td>
-            <td><span class="pill ${catCls(w.category)}">${w.categoryName}</span></td>
+            <td class="hide-mobile">${esc(w.project) || '—'}</td>
+            <td class="hide-mobile"><span class="pill ${catCls(w.category)}">${w.categoryName}</span></td>
             <td><span class="pill ${statCls(w.status)}">${w.statusName}</span></td>
             <td><strong>${(+w.hours).toFixed(1).replace(/\.0$/, '')}h</strong></td>
             <td style="text-align:right;white-space:nowrap">
@@ -240,6 +302,20 @@
     function fmtDate(d) { const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('en-US', { weekday: 'short', day: '2-digit' }); }
     function inRange(d) { return d >= RANGE.from && d <= RANGE.to; }
     function taskEmptyCheck() { $('#tasksEmpty').style.display = $('#taskBody').children.length ? 'none' : ''; }
+
+    // Smart AI: suggest category + hours from task description
+    $('#aiSuggestBtn').addEventListener('click', async () => {
+        const task = $('#tTask').value.trim();
+        if (!task) return toast('Enter a task description first');
+        const btn = $('#aiSuggestBtn'); btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        try {
+            const r = await api('POST', '/api/work/suggest', { task });
+            $('#tCategory').value = r.category;
+            $('#tHours').value = r.hours;
+            toast('Smart AI suggested category & hours');
+        } catch (e) { toast(e.message); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-cpu"></i> Suggest'; }
+    });
 
     $('#saveTaskBtn').addEventListener('click', async () => {
         const task = $('#tTask').value.trim();
@@ -263,7 +339,31 @@
         } catch (e) { toast(e.message); }
     });
 
-    // ---------- AI summary ----------
+    // ---------- Smart AI: Daily Standup ----------
+    const standupModal = $('#standupModal');
+
+    async function generateStandup() {
+        const out = $('#standupOut'), src = $('#standupSource');
+        out.textContent = ''; src.textContent = '';
+        out.innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted)"><i class="bi bi-cpu" style="font-size:22px;display:block;margin-bottom:6px"></i>Smart AI is writing your standup…</div>';
+        try {
+            const r = await api('GET', '/api/work/standup');
+            out.textContent = r.text;
+            src.innerHTML = `<i class="bi bi-cpu"></i> Generated by <strong>Smart AI</strong>`;
+        } catch (e) { out.textContent = '⚠ ' + e.message; }
+    }
+
+    $('#standupBtn').addEventListener('click', () => {
+        standupModal.classList.add('open');
+        generateStandup();
+    });
+    $('#regenStandupBtn').addEventListener('click', generateStandup);
+    $('#copyStandupBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText($('#standupOut').textContent);
+        toast('Standup copied to clipboard');
+    });
+
+    // ---------- AI weekly summary ----------
     $('#genSummaryBtn').addEventListener('click', async () => {
         const btn = $('#genSummaryBtn'); const out = $('#aiOut'); const src = $('#aiSource');
         btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Thinking…';
@@ -271,7 +371,7 @@
         try {
             const r = await api('GET', `/api/work/summary?from=${RANGE.from}&to=${RANGE.to}`);
             out.textContent = r.text;
-            src.innerHTML = `<i class="bi bi-cpu"></i> Generated by <strong>${r.source === 'ollama' ? 'Ollama (local model)' : 'local engine'}</strong> · ${r.count} entries · ${r.hours} h`;
+            src.innerHTML = `<i class="bi bi-cpu"></i> Generated by <strong>Smart AI</strong> · ${r.count} entries · ${r.hours}h`;
             $('#aiCopyWrap').style.display = '';
         } catch (e) { out.textContent = '⚠ ' + e.message; }
         finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars"></i> Generate summary'; }

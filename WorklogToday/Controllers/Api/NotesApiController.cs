@@ -113,6 +113,20 @@ public class NotesApiController : ControllerBase
         return Ok(new { ok = true });
     }
 
+    [HttpPost("{id:int}/extract-tasks")]
+    public async Task<IActionResult> ExtractTasks(int id, CancellationToken ct)
+    {
+        var note = await Find(id);
+        if (note == null) return NotFound();
+        var (tasks, source) = await _ai.ExtractTasksAsync(note.Title, note.Content, ct);
+        return Ok(new
+        {
+            tasks = tasks.Select(t => new { t.Task, t.Category, t.Hours }),
+            source,
+            count = tasks.Count
+        });
+    }
+
     [HttpPost("suggest-labels")]
     public async Task<IActionResult> SuggestLabels([FromBody] NoteDto dto, CancellationToken ct)
     {

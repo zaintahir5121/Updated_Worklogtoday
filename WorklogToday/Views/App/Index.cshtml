@@ -20,11 +20,14 @@
             <i class="bi bi-search" style="color:var(--muted)"></i>
             <input id="noteSearch" placeholder="Search notes…" />
         </div>
-        <button class="btn btn-ghost btn-sm" id="newStickyBtn" type="button" title="Open a desktop sticky note"><i class="bi bi-window-plus"></i> New sticky</button>
-        <button class="btn btn-amber btn-sm" id="installBtn" type="button" style="display:none" title="Install worklog.today on your desktop"><i class="bi bi-download"></i> Install app</button>
+        <button class="btn btn-ghost btn-sm hide-mobile" id="newStickyBtn" type="button" title="Open a desktop sticky note"><i class="bi bi-window-plus"></i> <span class="btn-label">New sticky</span></button>
+        <button class="btn btn-amber btn-sm" id="installBtn" type="button" style="display:none" title="Install worklog.today"><i class="bi bi-download"></i> <span class="btn-label">Install</span></button>
+        <a class="bmc-btn hide-mobile" href="https://buymeacoffee.com/zaintahir512" target="_blank" rel="noopener" title="Buy me a coffee ☕">
+            <i class="bi bi-cup-hot-fill"></i>
+        </a>
         <div class="app-user">
             <span class="avatar" style="background:@Model.User.AvatarColor" title="@Model.User.FullName">@Initials(Model.User.FullName)</span>
-            <div style="line-height:1.1">
+            <div class="user-name-wrap">
                 <div style="font-weight:600;font-size:14px">@Model.User.FullName</div>
                 <div style="font-size:12px;color:var(--muted)">@(Model.User.JobTitle ?? "Member")</div>
             </div>
@@ -36,10 +39,10 @@
 </div>
 
 <div class="app-tabs">
-    <button class="app-tab active" data-tab="notes"><i class="bi bi-sticky"></i> Notes</button>
-    <button class="app-tab" data-tab="tasks"><i class="bi bi-list-check"></i> Daily Tasks</button>
-    <button class="app-tab" data-tab="timesheet"><i class="bi bi-calendar-week"></i> Timesheet</button>
-    <button class="app-tab" data-tab="reports"><i class="bi bi-bar-chart"></i> Reports</button>
+    <button class="app-tab active" data-tab="notes"><i class="bi bi-sticky"></i> <span class="tab-label">Notes</span></button>
+    <button class="app-tab" data-tab="tasks"><i class="bi bi-list-check"></i> <span class="tab-label">Tasks</span></button>
+    <button class="app-tab" data-tab="timesheet"><i class="bi bi-calendar-week"></i> <span class="tab-label">Timesheet</span></button>
+    <button class="app-tab" data-tab="reports"><i class="bi bi-bar-chart"></i> <span class="tab-label">Reports</span></button>
 </div>
 
 <div class="app-body" data-from="@Model.WeekStart.ToString("yyyy-MM-dd")" data-to="@Model.WeekEnd.ToString("yyyy-MM-dd")" data-today="@DateTime.UtcNow.ToString("yyyy-MM-dd")">
@@ -56,8 +59,8 @@
                         <span class="sw @(c == "#ffffff" ? "active" : "")" style="background:@c" data-color="@c"></span>
                     }
                 </div>
-                <button class="btn btn-ghost btn-sm" id="aiLabelBtn" type="button" title="Suggest labels with AI"><i class="bi bi-magic"></i> AI tags</button>
-                <input id="cLabels" class="input" style="flex:1;min-width:120px;padding:7px 10px" placeholder="labels (comma separated)" />
+                <button class="btn btn-ghost btn-sm" id="aiLabelBtn" type="button" title="Smart AI tag suggestions"><i class="bi bi-magic"></i> AI tags</button>
+                <input id="cLabels" class="input" style="flex:1;min-width:100px;padding:7px 10px" placeholder="labels (comma separated)" />
                 <button class="btn btn-amber btn-sm" id="saveNoteBtn" type="button"><i class="bi bi-check-lg"></i> Add</button>
             </div>
         </div>
@@ -87,20 +90,23 @@
                 <a class="icon-btn" href="@Url.Action("Index", new { week = Model.WeekOffset + 1 })"><i class="bi bi-chevron-right"></i></a>
                 @if (Model.WeekOffset != 0) { <a class="btn btn-ghost btn-sm" href="@Url.Action("Index")">This week</a> }
             </div>
-            <button class="btn btn-amber btn-sm" id="addTaskBtn" type="button"><i class="bi bi-plus-lg"></i> Log a task</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-ghost btn-sm" id="standupBtn" type="button"><i class="bi bi-megaphone"></i> <span class="btn-label">Standup</span></button>
+                <button class="btn btn-amber btn-sm" id="addTaskBtn" type="button"><i class="bi bi-plus-lg"></i> <span class="btn-label">Log task</span></button>
+            </div>
         </div>
         <div class="card">
-            <div class="bd">
+            <div class="bd table-wrap">
                 <table class="t" id="taskTable">
-                    <thead><tr><th>Date</th><th>Task</th><th>Project</th><th>Category</th><th>Status</th><th>Hours</th><th></th></tr></thead>
+                    <thead><tr><th>Date</th><th>Task</th><th class="hide-mobile">Project</th><th class="hide-mobile">Category</th><th>Status</th><th>Hours</th><th></th></tr></thead>
                     <tbody id="taskBody">
                     @foreach (var w in Model.WeekEntries)
                     {
                         <tr data-id="@w.Id" data-task="@w.Task" data-project="@w.Project" data-category="@((int)w.Category)" data-status="@((int)w.Status)" data-hours="@w.Hours" data-date="@w.Date.ToString("yyyy-MM-dd")" data-billable="@w.Billable.ToString().ToLower()" data-notes="@w.Notes">
                             <td>@w.Date.ToString("ddd dd")</td>
-                            <td><strong>@w.Task</strong>@(w.Billable ? "" : " ")@(!w.Billable ? Html.Raw("<span class='pill p-other' style='font-size:10px'>non-billable</span>") : null)</td>
-                            <td>@(w.Project ?? "—")</td>
-                            <td><span class="pill @Cat(w.Category)">@w.Category</span></td>
+                            <td><strong>@w.Task</strong>@(!w.Billable ? Html.Raw(" <span class='pill p-other' style='font-size:10px'>non-billable</span>") : null)</td>
+                            <td class="hide-mobile">@(w.Project ?? "—")</td>
+                            <td class="hide-mobile"><span class="pill @Cat(w.Category)">@w.Category</span></td>
                             <td><span class="pill @Stat(w.Status)">@w.Status</span></td>
                             <td><strong>@w.Hours.ToString("0.#")h</strong></td>
                             <td style="text-align:right;white-space:nowrap">
@@ -112,7 +118,7 @@
                     </tbody>
                 </table>
                 <div class="empty" id="tasksEmpty" style="@(Model.WeekEntries.Any() ? "display:none" : "")">
-                    <i class="bi bi-clipboard-check"></i><p>No tasks logged this week. Click “Log a task”.</p>
+                    <i class="bi bi-clipboard-check"></i><p>No tasks logged this week. Click "Log task".</p>
                 </div>
             </div>
         </div>
@@ -127,7 +133,7 @@
             <div class="stat"><div class="v">@Model.NoteCount</div><div class="l">Active notes</div></div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:18px" class="ts-grid">
+        <div class="ts-grid" style="display:grid;grid-template-columns:1.4fr 1fr;gap:18px">
             <div class="card">
                 <div class="hd"><strong>Daily breakdown</strong><span style="color:var(--muted);font-size:13px">@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM")</span></div>
                 <div class="bd" style="padding:16px">
@@ -162,11 +168,11 @@
 
         <div class="ai-panel" style="margin-top:18px">
             <div class="ai-head">
-                <span class="ai-badge"><i class="bi bi-magic"></i> AI</span>
+                <span class="ai-badge"><i class="bi bi-cpu"></i> Smart AI</span>
                 <strong>Weekly status summary</strong>
                 <button class="btn btn-amber btn-sm" id="genSummaryBtn" type="button" style="margin-left:auto"><i class="bi bi-stars"></i> Generate summary</button>
             </div>
-            <div style="color:var(--muted);font-size:13.5px">Turn this week's tasks into a ready-to-submit report. Uses your local Ollama model when available, otherwise an instant local engine.</div>
+            <div style="color:var(--muted);font-size:13.5px">Turn this week's tasks into a ready-to-submit report with one click.</div>
             <div class="ai-out" id="aiOut"></div>
             <div class="ai-source" id="aiSource"></div>
             <div id="aiCopyWrap" style="display:none;margin-top:10px">
@@ -177,7 +183,7 @@
 
     <!-- REPORTS -->
     <section class="tab-pane" id="pane-reports">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px" class="ts-grid">
+        <div class="ts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
             <div class="card"><div class="hd"><strong>Hours by category</strong></div><div class="bd" style="padding:16px" id="repCategory"><div class="empty" style="padding:28px"><p>Loading…</p></div></div></div>
             <div class="card"><div class="hd"><strong>Hours by project</strong></div><div class="bd" style="padding:16px" id="repProject"><div class="empty" style="padding:28px"><p>Loading…</p></div></div></div>
         </div>
@@ -191,7 +197,13 @@
         <div class="mh"><span id="taskModalTitle">Log a task</span><button class="icon-btn" type="button" data-close>&times;</button></div>
         <div class="mb">
             <input type="hidden" id="tId" />
-            <div class="field"><label class="lbl">Task</label><input id="tTask" class="input" placeholder="What did you work on?" /></div>
+            <div class="field">
+                <label class="lbl">Task</label>
+                <div style="display:flex;gap:6px">
+                    <input id="tTask" class="input" placeholder="What did you work on?" style="flex:1" />
+                    <button class="btn btn-ghost btn-sm" id="aiSuggestBtn" type="button" title="Smart AI: suggest category &amp; hours"><i class="bi bi-cpu"></i> Suggest</button>
+                </div>
+            </div>
             <div class="row2">
                 <div class="field"><label class="lbl">Project</label><input id="tProject" class="input" placeholder="Project / client" /></div>
                 <div class="field"><label class="lbl">Date</label><input id="tDate" type="date" class="input" /></div>
@@ -229,6 +241,44 @@
         <div class="mf">
             <button class="btn btn-ghost" type="button" data-close>Cancel</button>
             <button class="btn btn-amber" type="button" id="saveNoteEditBtn"><i class="bi bi-check-lg"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Standup modal -->
+<div class="modal-bg" id="standupModal">
+    <div class="modal" style="max-width:560px">
+        <div class="mh">
+            <span><i class="bi bi-cpu" style="color:var(--amber)"></i> Smart AI Daily Standup</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="color:var(--muted);font-size:13px;margin-bottom:14px">Generated from your recent work entries — ready to paste into Slack, Teams, or email.</div>
+            <div id="standupOut" class="ai-out" style="min-height:80px;white-space:pre-wrap"></div>
+            <div id="standupSource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-ghost btn-sm" id="regenStandupBtn" type="button"><i class="bi bi-arrow-repeat"></i> Regenerate</button>
+            <button class="btn btn-amber btn-sm" id="copyStandupBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+    </div>
+</div>
+
+<!-- Extract tasks modal -->
+<div class="modal-bg" id="extractModal">
+    <div class="modal" style="max-width:580px">
+        <div class="mh">
+            <span><i class="bi bi-list-task" style="color:var(--amber)"></i> Smart AI: Tasks from Note</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="color:var(--muted);font-size:13px;margin-bottom:14px">AI found these action items. Select the ones you want to add to your task log.</div>
+            <div id="extractList"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="addExtractedBtn"><i class="bi bi-plus-lg"></i> Add selected tasks</button>
         </div>
     </div>
 </div>
