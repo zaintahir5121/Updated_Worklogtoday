@@ -127,6 +127,18 @@ public class NotesApiController : ControllerBase
         });
     }
 
+    [HttpPost("ask")]
+    public async Task<IActionResult> Ask([FromBody] AskDto dto, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Question)) return BadRequest(new { error = "Question is required." });
+        var notes = await _db.Notes.Where(n => n.UserId == Uid && !n.IsArchived)
+            .OrderByDescending(n => n.UpdatedAt).Take(30).ToListAsync();
+        var result = await _ai.AskNotesAsync(dto.Question.Trim(), notes, ct);
+        return Ok(new { answer = result.Text, source = result.Source });
+    }
+
+    public record AskDto(string Question);
+
     [HttpPost("suggest-labels")]
     public async Task<IActionResult> SuggestLabels([FromBody] NoteDto dto, CancellationToken ct)
     {

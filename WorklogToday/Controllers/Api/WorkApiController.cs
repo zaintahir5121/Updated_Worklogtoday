@@ -120,6 +120,42 @@ public class WorkApiController : ControllerBase
 
     public record SuggestDto(string Task);
 
+    [HttpGet("retro")]
+    public async Task<IActionResult> Retro(string from, string to, CancellationToken ct)
+    {
+        var f = ParseDate(from);
+        var t = ParseDate(to);
+        var entries = await _db.WorkEntries
+            .Where(w => w.UserId == Uid && w.Date >= f && w.Date <= t)
+            .OrderBy(w => w.Date).ToListAsync();
+        var result = await _ai.GenerateRetroAsync(entries, ct);
+        return Ok(new { text = result.Text, source = result.Source });
+    }
+
+    [HttpGet("productivity")]
+    public async Task<IActionResult> Productivity(string from, string to, CancellationToken ct)
+    {
+        var f = ParseDate(from);
+        var t = ParseDate(to);
+        var entries = await _db.WorkEntries
+            .Where(w => w.UserId == Uid && w.Date >= f && w.Date <= t)
+            .OrderBy(w => w.Date).ToListAsync();
+        var result = await _ai.GenerateProductivityInsightAsync(entries, ct);
+        return Ok(new { text = result.Text, source = result.Source });
+    }
+
+    [HttpGet("status-update")]
+    public async Task<IActionResult> StatusUpdate(string from, string to, string format = "email", CancellationToken ct = default)
+    {
+        var f = ParseDate(from);
+        var t = ParseDate(to);
+        var entries = await _db.WorkEntries
+            .Where(w => w.UserId == Uid && w.Date >= f && w.Date <= t)
+            .OrderBy(w => w.Date).ToListAsync();
+        var result = await _ai.GenerateStatusUpdateAsync(entries, format, ct);
+        return Ok(new { text = result.Text, source = result.Source });
+    }
+
     [HttpGet("report")]
     public async Task<IActionResult> Report(string from, string to)
     {

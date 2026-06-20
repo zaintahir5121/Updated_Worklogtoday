@@ -13,4 +13,8 @@ public interface IAiService
     Task<AiTaskSuggestion> SuggestTaskDetailsAsync(string taskDescription, CancellationToken ct = default);
     Task<AiResponse> GenerateStandupAsync(IReadOnlyList<WorkEntry> entries, CancellationToken ct = default);
     Task<(List<AiExtractedTask> Tasks, string Source)> ExtractTasksAsync(string? title, string content, CancellationToken ct = default);
+    Task<AiResponse> AskNotesAsync(string question, IReadOnlyList<Note> notes, CancellationToken ct = default);
+    Task<AiResponse> GenerateRetroAsync(IReadOnlyList<WorkEntry> entries, CancellationToken ct = default);
+    Task<AiResponse> GenerateProductivityInsightAsync(IReadOnlyList<WorkEntry> entries, CancellationToken ct = default);
+    Task<AiResponse> GenerateStatusUpdateAsync(IReadOnlyList<WorkEntry> entries, string format, CancellationToken ct = default);
 }

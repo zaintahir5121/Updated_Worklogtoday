@@ -60,6 +60,7 @@
                     }
                 </div>
                 <button class="btn btn-ghost btn-sm" id="aiLabelBtn" type="button" title="Smart AI tag suggestions"><i class="bi bi-magic"></i> AI tags</button>
+                <button class="btn btn-ghost btn-sm" id="askAiBtn" type="button" title="Ask AI about your notes"><i class="bi bi-chat-dots"></i> Ask AI</button>
                 <input id="cLabels" class="input" style="flex:1;min-width:100px;padding:7px 10px" placeholder="labels (comma separated)" />
                 <button class="btn btn-amber btn-sm" id="saveNoteBtn" type="button"><i class="bi bi-check-lg"></i> Add</button>
             </div>
@@ -92,6 +93,8 @@
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn btn-ghost btn-sm" id="standupBtn" type="button"><i class="bi bi-megaphone"></i> <span class="btn-label">Standup</span></button>
+                <button class="btn btn-ghost btn-sm" id="retroBtn" type="button"><i class="bi bi-arrow-repeat"></i> <span class="btn-label">Retro</span></button>
+                <button class="btn btn-ghost btn-sm" id="productivityBtn" type="button"><i class="bi bi-graph-up-arrow"></i> <span class="btn-label">Insights</span></button>
                 <button class="btn btn-amber btn-sm" id="addTaskBtn" type="button"><i class="bi bi-plus-lg"></i> <span class="btn-label">Log task</span></button>
             </div>
         </div>
@@ -171,6 +174,7 @@
                 <span class="ai-badge"><i class="bi bi-cpu"></i> Smart AI</span>
                 <strong>Weekly status summary</strong>
                 <button class="btn btn-amber btn-sm" id="genSummaryBtn" type="button" style="margin-left:auto"><i class="bi bi-stars"></i> Generate summary</button>
+                <button class="btn btn-ghost btn-sm" id="statusUpdateBtn" type="button"><i class="bi bi-send"></i> Status update</button>
             </div>
             <div style="color:var(--muted);font-size:13.5px">Turn this week's tasks into a ready-to-submit report with one click.</div>
             <div class="ai-out" id="aiOut"></div>
@@ -261,6 +265,91 @@
             <button class="btn btn-ghost" type="button" data-close>Close</button>
             <button class="btn btn-ghost btn-sm" id="regenStandupBtn" type="button"><i class="bi bi-arrow-repeat"></i> Regenerate</button>
             <button class="btn btn-amber btn-sm" id="copyStandupBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+    </div>
+</div>
+
+<!-- Retro modal -->
+<div class="modal-bg" id="retroModal">
+    <div class="modal" style="max-width:560px">
+        <div class="mh">
+            <span><i class="bi bi-arrow-repeat" style="color:var(--amber)"></i> Smart AI Weekly Retro</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="color:var(--muted);font-size:13px;margin-bottom:14px">What went well, what didn't, and what to focus on next week — generated from your entries.</div>
+            <div id="retroOut" class="ai-out" style="min-height:80px;white-space:pre-wrap"></div>
+            <div id="retroSource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-ghost btn-sm" id="regenRetroBtn" type="button"><i class="bi bi-arrow-repeat"></i> Regenerate</button>
+            <button class="btn btn-amber btn-sm" id="copyRetroBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+    </div>
+</div>
+
+<!-- Productivity Insights modal -->
+<div class="modal-bg" id="productivityModal">
+    <div class="modal" style="max-width:560px">
+        <div class="mh">
+            <span><i class="bi bi-graph-up-arrow" style="color:var(--amber)"></i> Smart AI Productivity Insights</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="color:var(--muted);font-size:13px;margin-bottom:14px">AI analysis of your work patterns with actionable tips.</div>
+            <div id="productivityOut" class="ai-out" style="min-height:80px;white-space:pre-wrap"></div>
+            <div id="productivitySource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-ghost btn-sm" id="regenProductivityBtn" type="button"><i class="bi bi-arrow-repeat"></i> Refresh</button>
+        </div>
+    </div>
+</div>
+
+<!-- Status Update modal -->
+<div class="modal-bg" id="statusUpdateModal">
+    <div class="modal" style="max-width:600px">
+        <div class="mh">
+            <span><i class="bi bi-send" style="color:var(--amber)"></i> Smart AI Status Update</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="display:flex;gap:8px;margin-bottom:14px">
+                <button class="btn btn-amber btn-sm" id="statusFmtEmail" type="button" data-fmt="email"><i class="bi bi-envelope"></i> Email</button>
+                <button class="btn btn-ghost btn-sm" id="statusFmtSlack" type="button" data-fmt="slack"><i class="bi bi-slack"></i> Slack</button>
+            </div>
+            <div id="statusUpdateOut" class="ai-out" style="min-height:80px;white-space:pre-wrap"></div>
+            <div id="statusUpdateSource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-amber btn-sm" id="copyStatusBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+    </div>
+</div>
+
+<!-- Ask AI modal -->
+<div class="modal-bg" id="askAiModal">
+    <div class="modal" style="max-width:580px">
+        <div class="mh">
+            <span><i class="bi bi-chat-dots" style="color:var(--amber)"></i> Ask AI about your notes</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div class="field">
+                <label class="lbl">Ask a question about your notes</label>
+                <div style="display:flex;gap:8px">
+                    <input id="askAiInput" class="input" placeholder="e.g. What did we decide about auth? What are my current blockers?" style="flex:1" />
+                    <button class="btn btn-amber btn-sm" id="askAiSubmitBtn" type="button"><i class="bi bi-send"></i></button>
+                </div>
+            </div>
+            <div id="askAiOut" class="ai-out" style="min-height:60px;white-space:pre-wrap;margin-top:8px"></div>
+            <div id="askAiSource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
         </div>
     </div>
 </div>

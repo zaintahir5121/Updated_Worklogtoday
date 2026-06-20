@@ -160,6 +160,111 @@ public class AiService : IAiService
         return (local, "ai");
     }
 
+    // ── Ask AI (Notes Q&A) ───────────────────────────────────────────────────
+
+    public async Task<AiResponse> AskNotesAsync(string question, IReadOnlyList<Note> notes, CancellationToken ct = default)
+    {
+        var local = LocalAskNotes(question, notes);
+        if (_provider.Equals("Local", StringComparison.OrdinalIgnoreCase) || notes.Count == 0)
+            return new AiResponse(local, "ai");
+
+        var context = new StringBuilder();
+        foreach (var n in notes.Take(20))
+        {
+            context.AppendLine($"--- Note: {n.Title ?? "(untitled)"} ---");
+            context.AppendLine(n.Content.Length > 600 ? n.Content[..600] + "…" : n.Content);
+        }
+
+        var prompt = $"You are a personal note assistant. Answer the user's question using ONLY the notes provided below. " +
+                     $"Be concise and specific. If the answer is not in the notes, say so clearly.\n\n" +
+                     $"Question: {question}\n\nNotes:\n{context}";
+
+        var ai = await TryAiAsync(prompt, ct);
+        return new AiResponse(ai ?? local, "ai");
+    }
+
+    // ── Weekly Retrospective ─────────────────────────────────────────────────
+
+    public async Task<AiResponse> GenerateRetroAsync(IReadOnlyList<WorkEntry> entries, CancellationToken ct = default)
+    {
+        var local = LocalRetro(entries);
+        if (_provider.Equals("Local", StringComparison.OrdinalIgnoreCase) || entries.Count == 0)
+            return new AiResponse(local, "ai");
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Generate a brief weekly retrospective in exactly this format:\n" +
+                      "✅ WENT WELL:\n• ...\n\n⚠️ COULD IMPROVE:\n• ...\n\n🎯 NEXT WEEK:\n• ...\n\n" +
+                      "Keep each section to 2-3 bullets. Base it on these work entries:\n");
+        foreach (var e in entries.OrderBy(e => e.Date))
+            sb.AppendLine($"- {e.Date:ddd dd MMM} | {e.Project ?? "General"} | {e.Category} | {e.Hours}h | {e.Status} | {e.Task}");
+        var blocked = entries.Count(e => e.Status == WorkStatus.Blocked);
+        var done = entries.Count(e => e.Status == WorkStatus.Done);
+        sb.AppendLine($"\nStats: {entries.Count} entries, {done} done, {blocked} blocked, {entries.Sum(e => e.Hours):0.#}h total.");
+
+        var ai = await TryAiAsync(sb.ToString(), ct);
+        return new AiResponse(ai ?? local, "ai");
+    }
+
+    // ── Productivity Insights ────────────────────────────────────────────────
+
+    public async Task<AiResponse> GenerateProductivityInsightAsync(IReadOnlyList<WorkEntry> entries, CancellationToken ct = default)
+    {
+        var local = LocalProductivityInsight(entries);
+        if (_provider.Equals("Local", StringComparison.OrdinalIgnoreCase) || entries.Count < 3)
+            return new AiResponse(local, "ai");
+
+        var byDay = entries.GroupBy(e => e.Date.DayOfWeek)
+            .Select(g => $"{g.Key}: {g.Sum(e => e.Hours):0.#}h").ToList();
+        var byCat = entries.GroupBy(e => e.Category)
+            .OrderByDescending(g => g.Sum(e => e.Hours))
+            .Select(g => $"{g.Key}: {g.Sum(e => e.Hours):0.#}h").ToList();
+        var total = entries.Sum(e => e.Hours);
+        var billable = entries.Where(e => e.Billable).Sum(e => e.Hours);
+        var meetings = entries.Where(e => e.Category == WorkCategory.Meeting).Sum(e => e.Hours);
+        var blocked = entries.Count(e => e.Status == WorkStatus.Blocked);
+
+        var prompt = $"Analyze this professional's work data and give 3-5 specific, actionable productivity insights. " +
+                     $"Focus on time distribution, potential improvements, and positive patterns. " +
+                     $"Format as bullet points starting with an emoji. Be encouraging but practical.\n\n" +
+                     $"Total hours: {total:0.#}h | Billable: {billable:0.#}h | Blocked tasks: {blocked}\n" +
+                     $"Hours by day: {string.Join(", ", byDay)}\n" +
+                     $"Hours by category: {string.Join(", ", byCat)}\n" +
+                     $"Meeting hours: {meetings:0.#}h ({(total > 0 ? meetings / total * 100 : 0):0}% of total)";
+
+        var ai = await TryAiAsync(prompt, ct);
+        return new AiResponse(ai ?? local, "ai");
+    }
+
+    // ── Status Update Generator ──────────────────────────────────────────────
+
+    public async Task<AiResponse> GenerateStatusUpdateAsync(IReadOnlyList<WorkEntry> entries, string format, CancellationToken ct = default)
+    {
+        var local = LocalStatusUpdate(entries, format);
+        if (_provider.Equals("Local", StringComparison.OrdinalIgnoreCase) || entries.Count == 0)
+            return new AiResponse(local, "ai");
+
+        var sb = new StringBuilder();
+        bool isSlack = format.Equals("slack", StringComparison.OrdinalIgnoreCase);
+
+        if (isSlack)
+            sb.AppendLine("Write a concise Slack status update for the week. Use Slack formatting (*bold*, bullet points with •). " +
+                          "Start with a one-line summary, then 3-5 bullet highlights grouped by project. End with any blockers. Keep it under 200 words.\n");
+        else
+            sb.AppendLine("Write a professional email-style weekly status update. Use a subject line, then a brief paragraph summary, " +
+                          "then bullet points grouped by project. End with blockers/risks if any. Keep it under 250 words. Professional tone.\n");
+
+        sb.AppendLine("Work entries this week:");
+        foreach (var g in entries.GroupBy(e => string.IsNullOrWhiteSpace(e.Project) ? "General" : e.Project!))
+        {
+            sb.AppendLine($"\n{g.Key} ({g.Sum(e => e.Hours):0.#}h):");
+            foreach (var e in g) sb.AppendLine($"  - {e.Task} ({e.Status})");
+        }
+        sb.AppendLine($"\nTotal: {entries.Sum(e => e.Hours):0.#}h | Blocked: {entries.Count(e => e.Status == WorkStatus.Blocked)}");
+
+        var ai = await TryAiAsync(sb.ToString(), ct);
+        return new AiResponse(ai ?? local, "ai");
+    }
+
     // ── Internal AI engine ───────────────────────────────────────────────────
 
     private async Task<string?> TryAiAsync(string prompt, CancellationToken ct)
@@ -329,6 +434,159 @@ public class AiService : IAiService
         ["plan"] = "planning", ["roadmap"] = "planning", ["todo"] = "todo", ["task"] = "todo",
         ["idea"] = "idea", ["research"] = "research"
     };
+
+    private static string LocalAskNotes(string question, IReadOnlyList<Note> notes)
+    {
+        if (notes.Count == 0) return "You have no notes yet. Create some notes to use the Q&A feature.";
+        var q = question.ToLowerInvariant();
+        var relevant = notes
+            .Select(n => new { n, score = ScoreNoteRelevance(q, n) })
+            .Where(x => x.score > 0)
+            .OrderByDescending(x => x.score)
+            .Take(3)
+            .Select(x => x.n)
+            .ToList();
+        if (relevant.Count == 0)
+            return $"No notes found matching \"{question}\". Try a different keyword or create notes on this topic.";
+        var sb = new StringBuilder();
+        sb.AppendLine($"Based on your notes, here's what I found for \"{question}\":\n");
+        foreach (var n in relevant)
+        {
+            sb.AppendLine($"📌 {n.Title ?? "(untitled)"}");
+            sb.AppendLine(n.Content.Length > 200 ? n.Content[..200] + "…" : n.Content);
+            sb.AppendLine();
+        }
+        return sb.ToString().Trim();
+    }
+
+    private static int ScoreNoteRelevance(string query, Note note)
+    {
+        var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var text = $"{note.Title} {note.Content} {note.Labels}".ToLowerInvariant();
+        return words.Count(w => w.Length > 2 && text.Contains(w));
+    }
+
+    private static string LocalRetro(IReadOnlyList<WorkEntry> entries)
+    {
+        if (entries.Count == 0)
+            return "No entries found for this period. Log work to generate a retrospective.";
+
+        var done = entries.Where(e => e.Status == WorkStatus.Done).ToList();
+        var blocked = entries.Where(e => e.Status == WorkStatus.Blocked).ToList();
+        var total = entries.Sum(e => e.Hours);
+        var topProjects = entries.GroupBy(e => e.Project ?? "General").OrderByDescending(g => g.Count()).Take(3).Select(g => g.Key);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("✅ WENT WELL:");
+        if (done.Any())
+            foreach (var e in done.Take(3)) sb.AppendLine($"• Completed: {e.Task} ({e.Project ?? "General"})");
+        else
+            sb.AppendLine($"• Logged {total:0.#}h across {entries.Count} tasks — good effort tracking!");
+        sb.AppendLine();
+        sb.AppendLine("⚠️ COULD IMPROVE:");
+        if (blocked.Any())
+            foreach (var e in blocked.Take(2)) sb.AppendLine($"• Unblocked needed: {e.Task}");
+        else
+            sb.AppendLine("• Consider tagging tasks as Done/Blocked for better tracking.");
+        if (total > 0 && entries.Count(e => e.Category == WorkCategory.Meeting) > 3)
+            sb.AppendLine("• High meeting load detected — consider blocking focus time.");
+        sb.AppendLine();
+        sb.AppendLine("🎯 NEXT WEEK:");
+        sb.AppendLine($"• Follow up on active projects: {string.Join(", ", topProjects)}");
+        sb.AppendLine("• Review any blocked items and clear dependencies.");
+        if (blocked.Any())
+            sb.AppendLine($"• Resolve {blocked.Count} blocked task(s) from this week.");
+        return sb.ToString().Trim();
+    }
+
+    private static string LocalProductivityInsight(IReadOnlyList<WorkEntry> entries)
+    {
+        if (entries.Count < 3)
+            return "Log more tasks (at least 3) to get productivity insights.";
+
+        var total = entries.Sum(e => e.Hours);
+        var billable = entries.Where(e => e.Billable).Sum(e => e.Hours);
+        var meetings = entries.Where(e => e.Category == WorkCategory.Meeting).Sum(e => e.Hours);
+        var devHours = entries.Where(e => e.Category == WorkCategory.Development).Sum(e => e.Hours);
+        var blocked = entries.Count(e => e.Status == WorkStatus.Blocked);
+        var busiest = entries.GroupBy(e => e.Date.DayOfWeek).OrderByDescending(g => g.Sum(e => e.Hours)).FirstOrDefault();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("📊 Your Productivity Insights:\n");
+
+        var meetPct = total > 0 ? meetings / total * 100 : 0;
+        if (meetPct > 35)
+            sb.AppendLine($"⚠️ **Meeting-heavy week** — {meetPct:0}% of time in meetings. Try blocking 2-hour focus sessions.");
+        else if (meetPct < 15)
+            sb.AppendLine($"✅ **Good focus ratio** — only {meetPct:0}% in meetings, leaving plenty of deep work time.");
+
+        if (billable > 0 && total > 0)
+        {
+            var billPct = billable / total * 100;
+            sb.AppendLine(billPct >= 70
+                ? $"💰 **Strong billable ratio** — {billPct:0}% of hours are billable. Great client focus."
+                : $"💡 **Billable opportunity** — only {billPct:0}% billable. Review which tasks can be billed.");
+        }
+
+        if (busiest != null)
+            sb.AppendLine($"📅 **Peak day: {busiest.Key}** — most productive day with {busiest.Sum(e => e.Hours):0.#}h logged.");
+
+        if (blocked > 0)
+            sb.AppendLine($"🚧 **{blocked} blocked task(s)** — unblock these first to maintain momentum.");
+
+        var projectCount = entries.Select(e => e.Project).Distinct().Count();
+        if (projectCount > 5)
+            sb.AppendLine($"🔄 **Context switching** — working across {projectCount} projects. Consider batching similar work.");
+        else
+            sb.AppendLine($"🎯 **Focused** — working on {projectCount} project(s). Good context discipline.");
+
+        return sb.ToString().Trim();
+    }
+
+    private static string LocalStatusUpdate(IReadOnlyList<WorkEntry> entries, string format)
+    {
+        if (entries.Count == 0) return "No entries found for this period.";
+
+        var total = entries.Sum(e => e.Hours);
+        var done = entries.Count(e => e.Status == WorkStatus.Done);
+        var blocked = entries.Where(e => e.Status == WorkStatus.Blocked).ToList();
+        var byProject = entries.GroupBy(e => string.IsNullOrWhiteSpace(e.Project) ? "General" : e.Project!).OrderByDescending(g => g.Sum(e => e.Hours));
+
+        bool isSlack = format.Equals("slack", StringComparison.OrdinalIgnoreCase);
+        var sb = new StringBuilder();
+
+        if (isSlack)
+        {
+            sb.AppendLine($"*Weekly Update* — {total:0.#}h logged, {done} tasks completed");
+            sb.AppendLine();
+            foreach (var g in byProject)
+            {
+                sb.AppendLine($"*{g.Key}* ({g.Sum(e => e.Hours):0.#}h)");
+                foreach (var e in g.Take(3)) sb.AppendLine($"• {e.Task}");
+            }
+            if (blocked.Any()) { sb.AppendLine(); sb.AppendLine("*Blockers:*"); foreach (var e in blocked) sb.AppendLine($"• {e.Task}"); }
+        }
+        else
+        {
+            sb.AppendLine($"Subject: Weekly Status Update — {DateTime.UtcNow:MMMM dd, yyyy}");
+            sb.AppendLine();
+            sb.AppendLine($"This week I logged {total:0.#} hours across {entries.Count} tasks, completing {done} items.");
+            sb.AppendLine();
+            sb.AppendLine("Highlights by project:");
+            foreach (var g in byProject)
+            {
+                sb.AppendLine($"\n{g.Key} ({g.Sum(e => e.Hours):0.#}h):");
+                foreach (var e in g.Take(3)) sb.AppendLine($"  • {e.Task} [{e.Status}]");
+            }
+            if (blocked.Any())
+            {
+                sb.AppendLine("\nBlockers / Risks:");
+                foreach (var e in blocked) sb.AppendLine($"  • {e.Task}");
+            }
+            sb.AppendLine("\nBest regards");
+        }
+        return sb.ToString().Trim();
+    }
 
     private static string LocalLabels(string title, string content)
     {
