@@ -1,0 +1,104 @@
+@model Note
+@{
+    Layout = null;
+    var colors = new[] { "#fff8c5", "#d3f9d8", "#dbeafe", "#fbe4ff", "#ffe8cc", "#ffd6d6", "#ffffff" };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(string.IsNullOrWhiteSpace(Model.Title) ? "Sticky note" : Model.Title) · worklog</title>
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="~/manifest.webmanifest" />
+    <meta name="theme-color" content="@Model.ColorHex" />
+    <link rel="apple-touch-icon" href="~/icons/apple-touch-icon.png" />
+    <meta name="robots" content="noindex" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <style>
+        :root { --bg: @Model.ColorHex; }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body { font-family: "Inter", system-ui, sans-serif; background: var(--bg); display: flex; flex-direction: column; color: #202124; transition: background .2s; overflow: hidden; }
+        .bar { display: flex; align-items: center; gap: 6px; padding: 7px 10px; -webkit-app-region: drag; }
+        .bar .grip { color: rgba(0,0,0,.35); font-size: 14px; margin-right: 2px; }
+        .dots { display: flex; gap: 5px; -webkit-app-region: no-drag; }
+        .dot { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid rgba(0,0,0,.18); cursor: pointer; }
+        .dot.active { outline: 2px solid rgba(0,0,0,.45); outline-offset: 1px; }
+        .sp { flex: 1; }
+        .ib { width: 28px; height: 28px; border: none; background: transparent; border-radius: 7px; cursor: pointer; color: rgba(0,0,0,.55); font-size: 15px; -webkit-app-region: no-drag; }
+        .ib:hover { background: rgba(0,0,0,.1); color: #000; }
+        .title { border: none; background: transparent; outline: none; font-size: 16px; font-weight: 700; padding: 4px 14px; font-family: inherit; }
+        .body { flex: 1; border: none; background: transparent; outline: none; resize: none; font-size: 14.5px; line-height: 1.5; padding: 6px 14px 10px; font-family: inherit; }
+        .foot { display: flex; align-items: center; justify-content: space-between; padding: 5px 12px; font-size: 11px; color: rgba(0,0,0,.45); }
+        .foot a { color: rgba(0,0,0,.6); text-decoration: none; }
+        .saved { display: flex; align-items: center; gap: 5px; }
+    </style>
+</head>
+<body>
+    @Html.AntiForgeryToken()
+    <div class="bar">
+        <i class="bi bi-grip-vertical grip"></i>
+        <div class="dots" id="dots">
+            @foreach (var c in colors)
+            {
+                <span class="dot @(c == Model.ColorHex ? "active" : "")" style="background:@c" data-color="@c"></span>
+            }
+        </div>
+        <span class="sp"></span>
+        <button class="ib" id="newBtn" title="New sticky"><i class="bi bi-plus-lg"></i></button>
+        <button class="ib" id="appBtn" title="Open workspace"><i class="bi bi-box-arrow-up-right"></i></button>
+        <button class="ib" id="closeBtn" title="Close"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <input class="title" id="title" placeholder="Title" value="@Model.Title" />
+    <textarea class="body" id="body" placeholder="Take a note…">@Model.Content</textarea>
+    <div class="foot">
+        <span class="saved" id="status"><i class="bi bi-check-circle"></i> Saved</span>
+        <a href="/app">worklog.today</a>
+    </div>
+
+    <script>
+        const ID = @Model.Id;
+        const TOKEN = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        const title = document.getElementById('title'), body = document.getElementById('body'), status = document.getElementById('status');
+        let color = '@Model.ColorHex', t;
+
+        function setStatus(html) { status.innerHTML = html; }
+        async function save() {
+            setStatus('<i class="bi bi-arrow-repeat"></i> Saving…');
+            try {
+                await fetch('/api/notes/' + ID, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': TOKEN },
+                    body: JSON.stringify({ title: title.value, content: body.value, colorHex: color, labels: null })
+                });
+                document.title = (title.value || 'Sticky note') + ' · worklog';
+                setStatus('<i class="bi bi-check-circle"></i> Saved');
+            } catch { setStatus('<i class="bi bi-cloud-slash"></i> Offline'); }
+        }
+        function queue() { clearTimeout(t); t = setTimeout(save, 600); }
+        title.addEventListener('input', queue);
+        body.addEventListener('input', queue);
+        window.addEventListener('beforeunload', () => {
+            navigator.sendBeacon && fetch('/api/notes/' + ID, { method: 'PUT', keepalive: true,
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': TOKEN },
+                body: JSON.stringify({ title: title.value, content: body.value, colorHex: color, labels: null }) });
+        });
+
+        document.getElementById('dots').addEventListener('click', e => {
+            const d = e.target.closest('.dot'); if (!d) return;
+            color = d.dataset.color;
+            document.body.style.setProperty('--bg', color);
+            document.querySelector('meta[name=theme-color]').setAttribute('content', color);
+            document.querySelectorAll('.dot').forEach(x => x.classList.toggle('active', x === d));
+            save();
+        });
+        document.getElementById('newBtn').addEventListener('click', () =>
+            window.open('/sticky/new?color=' + encodeURIComponent(color), '_blank', 'width=300,height=320'));
+        document.getElementById('appBtn').addEventListener('click', () => window.open('/app', '_blank'));
+        document.getElementById('closeBtn').addEventListener('click', () => window.close());
+        body.focus();
+    </script>
+</body>
+</html>
