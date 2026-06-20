@@ -27,6 +27,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(w => w.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Entity<ApplicationUser>().Property(u => u.HourlyRate).HasPrecision(10, 2);
         builder.Entity<Note>().HasIndex(n => new { n.UserId, n.IsArchived, n.IsPinned });
         builder.Entity<WorkEntry>().HasIndex(w => new { w.UserId, w.Date });
     }

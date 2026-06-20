@@ -518,6 +518,83 @@
     $('#askAiSubmitBtn').addEventListener('click', askAi);
     $('#askAiInput').addEventListener('keydown', e => { if (e.key === 'Enter') askAi(); });
 
+    // ---------- Friday nudge banner ----------
+    (function () {
+        const banner = $('#fridayNudge');
+        if (!banner) return;
+        const dismissed = localStorage.getItem('wt_nudge_dismissed');
+        const today = new Date();
+        const isFriday = today.getDay() === 5;
+        const thisWeekKey = `friday_${today.getFullYear()}_${Math.floor((today - new Date(today.getFullYear(), 0, 1)) / 604800000)}`;
+        if (isFriday && dismissed !== thisWeekKey) banner.style.display = 'flex';
+
+        $('#nudgeSummaryBtn').addEventListener('click', () => {
+            banner.style.display = 'none';
+            localStorage.setItem('wt_nudge_dismissed', thisWeekKey);
+            activateTab('timesheet');
+            setTimeout(() => { const btn = $('#genSummaryBtn'); if (btn) btn.click(); }, 200);
+        });
+        $('#nudgeDismissBtn').addEventListener('click', () => {
+            banner.style.display = 'none';
+            localStorage.setItem('wt_nudge_dismissed', thisWeekKey);
+        });
+    })();
+
+    // ---------- End-of-day quick log ----------
+    (function () {
+        const eodKey = 'wt_eod_' + new Date().toISOString().slice(0, 10);
+        if (localStorage.getItem(eodKey)) return; // already shown today
+
+        const hour = new Date().getHours();
+        if (hour < 16) return; // only show after 4pm
+
+        const modal = $('#eodModal');
+        setTimeout(() => modal && modal.classList.add('open'), 1500);
+
+        $('#saveEodBtn').addEventListener('click', async () => {
+            const task = $('#eodTask').value.trim();
+            if (!task) return toast('Add at least a task description');
+            try {
+                const today = new Date().toISOString().slice(0, 10);
+                await api('POST', '/api/work', {
+                    task,
+                    project: $('#eodProject').value.trim() || null,
+                    hours: parseFloat($('#eodHours').value) || 8,
+                    date: today,
+                    category: 0,
+                    status: 2,
+                    billable: true
+                });
+                localStorage.setItem(eodKey, '1');
+                modal.classList.remove('open');
+                toast('Logged! Great work today 🎉');
+                setTimeout(() => location.reload(), 800);
+            } catch (e) { toast('⚠ ' + e.message); }
+        });
+
+        $$('[data-close]', modal).forEach(b => b.addEventListener('click', () => {
+            localStorage.setItem(eodKey, '1'); // skip today if dismissed
+            modal.classList.remove('open');
+        }));
+    })();
+
+    // ---------- Settings modal ----------
+    const settingsModal = $('#settingsModal');
+    $('#settingsBtn').addEventListener('click', () => settingsModal.classList.add('open'));
+    $('#saveSettingsBtn').addEventListener('click', async () => {
+        try {
+            await api('POST', '/api/user/settings', {
+                emailDigestEnabled: $('#sDigest').checked,
+                hourlyRate: parseFloat($('#sRate').value) || 0,
+                jobTitle: $('#sTitle').value.trim(),
+                company: $('#sCompany').value.trim()
+            });
+            settingsModal.classList.remove('open');
+            toast('Settings saved!');
+            setTimeout(() => location.reload(), 600);
+        } catch (e) { toast('⚠ ' + e.message); }
+    });
+
     // ---------- Modals close ----------
     $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal-bg').classList.remove('open')));
     $$('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));

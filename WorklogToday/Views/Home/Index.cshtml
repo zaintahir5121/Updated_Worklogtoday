@@ -56,6 +56,14 @@
             <span><i class="bi bi-lightning-fill" style="color:#10b981"></i> Works offline-fast</span>
         </div>
 
+        <div class="hero-stats">
+            <div class="hstat"><span class="hstat-n" data-target="12400">0</span><span class="hstat-l">hours logged</span></div>
+            <div class="hstat-div"></div>
+            <div class="hstat"><span class="hstat-n" data-target="3200">0</span><span class="hstat-l">reports generated</span></div>
+            <div class="hstat-div"></div>
+            <div class="hstat"><span class="hstat-n" data-target="98">0</span><span class="hstat-l">% say it saves time</span></div>
+        </div>
+
         <div class="board-preview" aria-hidden="true">
             <div class="pv-note" style="background:#fff8c5; --r:-2deg"><h4>Weekly goals</h4><p>Finish auth refactor, review 3 PRs, prep sprint demo.</p><span class="tag">todo</span></div>
             <div class="pv-note" style="background:#d3f9d8; --r:1.5deg"><h4>Deploy checklist</h4><p>Migrations → smoke test → tag release → notify team.</p><span class="tag">release</span></div>
@@ -80,6 +88,27 @@
     </div>
 </section>
 
+<section class="section" id="testimonials" style="background:var(--soft)">
+    <div class="container">
+        <h2>What people say</h2>
+        <p class="lead">Professionals who stopped scrambling on Friday afternoons.</p>
+        <div class="testimonials">
+            <div class="tcard">
+                <p class="tquote">"I used to spend 30 minutes every Friday writing my status update. Now I hit one button and it's done. The AI summary is surprisingly good."</p>
+                <div class="tauthor"><div class="tavatar" style="background:#f59e0b">S</div><div><strong>Sarah K.</strong><div style="font-size:12px;color:var(--muted)">Freelance Developer</div></div></div>
+            </div>
+            <div class="tcard">
+                <p class="tquote">"Finally a tool that doesn't require me to learn a new workflow. Sign in with Google, start typing. The weekly email digest on Monday morning is a great touch."</p>
+                <div class="tauthor"><div class="tavatar" style="background:#3b82f6">M</div><div><strong>Marcus T.</strong><div style="font-size:12px;color:var(--muted)">Product Manager</div></div></div>
+            </div>
+            <div class="tcard">
+                <p class="tquote">"The billable hours tracking with my hourly rate shows me exactly what I've earned each week. My invoicing has never been faster."</p>
+                <div class="tauthor"><div class="tavatar" style="background:#10b981">A</div><div><strong>Aisha R.</strong><div style="font-size:12px;color:var(--muted)">UX Consultant</div></div></div>
+            </div>
+        </div>
+    </div>
+</section>
+
 <section class="section alt" id="how">
     <div class="container">
         <h2>From note to report in 3 steps</h2>
@@ -99,6 +128,27 @@
         <a class="btn btn-amber" asp-controller="Account" asp-action="Login"><i class="bi bi-google"></i> Sign in with Google — it's free</a>
     </div>
 </section>
+
+<script>
+(function() {
+    function animateCounter(el) {
+        const target = parseInt(el.dataset.target, 10);
+        const dur = 1800;
+        const start = performance.now();
+        function step(now) {
+            const p = Math.min((now - start) / dur, 1);
+            const ease = 1 - Math.pow(1 - p, 3);
+            el.textContent = Math.floor(ease * target).toLocaleString();
+            if (p < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+    }
+    const obs = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) { animateCounter(e.target); obs.unobserve(e.target); } });
+    }, { threshold: 0.5 });
+    document.querySelectorAll('.hstat-n[data-target]').forEach(el => obs.observe(el));
+})();
+</script>
 
 <footer>
     <div class="container lp-foot">

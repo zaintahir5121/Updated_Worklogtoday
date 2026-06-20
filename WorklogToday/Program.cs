@@ -53,6 +53,8 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 builder.Services.AddHttpClient<IAiService, AiService>();
+builder.Services.AddSingleton<IEmailService, EmailService>();
+builder.Services.AddHostedService<DigestWorker>();
 builder.Services.AddControllersWithViews();
 builder.Services.AddResponseCompression();
 

@@ -10,6 +10,9 @@ public class ApplicationUser : IdentityUser
     public string AvatarColor { get; set; } = "#f59e0b";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    public bool EmailDigestEnabled { get; set; } = false;
+    public decimal HourlyRate { get; set; } = 0;
+
     public ICollection<Note> Notes { get; set; } = new List<Note>();
     public ICollection<WorkEntry> WorkEntries { get; set; } = new List<WorkEntry>();
 }
