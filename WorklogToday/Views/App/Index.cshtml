@@ -7,7 +7,7 @@
     string Initials(string n) => string.IsNullOrWhiteSpace(n) ? "?" :
         string.Concat(n.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => p[0])).ToUpper();
     var days = Enumerable.Range(0, 7).Select(i => Model.WeekStart.AddDays(i)).ToList();
-    var maxProj = Model.HoursByProject.Values.DefaultIfEmpty(0).Max();
+    var maxProj = Model.HoursByProject?.Values.DefaultIfEmpty(0).Max() ?? 0;
 }
 @section Head { <meta name="robots" content="noindex" /> }
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -24,7 +25,12 @@ public class AppController : Controller
     public async Task<IActionResult> Index(int week = 0)
     {
         var userId = _users.GetUserId(User)!;
-        var user = (await _users.GetUserAsync(User))!;
+        var user = await _users.GetUserAsync(User);
+        if (user == null)
+        {
+            await HttpContext.SignOutAsync();
+            return RedirectToAction("Login", "Account");
+        }
 
         var notes = await _db.Notes
             .Where(n => n.UserId == userId && !n.IsArchived)
