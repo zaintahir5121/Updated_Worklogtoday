@@ -299,6 +299,30 @@
             </div>`).join('');
     }
 
+    // ---------- Live sync from sticky notes ----------
+    let lastSyncAt = new Date().toISOString();
+    async function syncNotes() {
+        const activeTab = $$('.app-tab').find(b => b.classList.contains('active'));
+        if (!activeTab || activeTab.dataset.tab !== 'notes') return;
+        try {
+            const updated = await api('GET', `/api/notes?since=${encodeURIComponent(lastSyncAt)}`);
+            if (!updated.length) return;
+            lastSyncAt = new Date().toISOString();
+            updated.forEach(n => {
+                const existing = $(`[data-id="${n.id}"]`);
+                if (existing) {
+                    const newEl = makeNoteEl(n);
+                    existing.replaceWith(newEl);
+                } else {
+                    addNoteToDom(n, false);
+                    $('#notesEmpty').style.display = 'none';
+                }
+            });
+            refreshSections();
+        } catch { /* ignore network errors */ }
+    }
+    setInterval(syncNotes, 5000);
+
     // ---------- Modals close ----------
     $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal-bg').classList.remove('open')));
     $$('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));

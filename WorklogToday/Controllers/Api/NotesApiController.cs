@@ -35,6 +35,17 @@ public class NotesApiController : ControllerBase
         updatedAt = n.UpdatedAt
     };
 
+    [HttpGet]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> List([FromQuery] DateTime? since)
+    {
+        var query = _db.Notes.Where(n => n.UserId == Uid && !n.IsArchived);
+        if (since.HasValue)
+            query = query.Where(n => n.UpdatedAt > since.Value);
+        var notes = await query.OrderByDescending(n => n.IsPinned).ThenByDescending(n => n.UpdatedAt).ToListAsync();
+        return Ok(notes.Select(Shape));
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] NoteDto dto)
     {
