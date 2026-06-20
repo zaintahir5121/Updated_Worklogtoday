@@ -1,0 +1,25 @@
+{
+  "name": "worklog.today — Notes & Timesheets",
+  "short_name": "worklog",
+  "description": "Sticky notes, daily tasks and timesheets with AI summaries.",
+  "id": "/app",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#ffffff",
+  "theme_color": "#f59e0b",
+  "orientation": "any",
+  "categories": ["productivity", "business"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "New sticky note", "short_name": "New sticky", "url": "/sticky/new", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Open workspace", "url": "/app" },
+    { "name": "Timesheet", "url": "/app?tab=timesheet" }
+  ]
+}

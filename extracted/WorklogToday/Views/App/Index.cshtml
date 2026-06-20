@@ -1,0 +1,240 @@
+@model AppViewModel
+@{
+    ViewData["Title"] = "Workspace · worklog.today";
+    Layout = "_Layout";
+    string Cat(WorkCategory c) => "p-" + c.ToString().ToLower();
+    string Stat(WorkStatus s) => "s-" + s.ToString().ToLower();
+    string Initials(string n) => string.IsNullOrWhiteSpace(n) ? "?" :
+        string.Concat(n.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => p[0])).ToUpper();
+    var days = Enumerable.Range(0, 7).Select(i => Model.WeekStart.AddDays(i)).ToList();
+    var maxProj = Model.HoursByProject.Values.DefaultIfEmpty(0).Max();
+}
+@section Head { <meta name="robots" content="noindex" /> }
+
+@Html.AntiForgeryToken()
+
+<div class="app-top">
+    <div class="inner">
+        <a class="logo" href="/app" style="font-size:19px"><span class="mark" style="width:30px;height:30px;font-size:15px"><i class="bi bi-journal-text"></i></span>worklog<span class="dot">.today</span></a>
+        <div class="app-search">
+            <i class="bi bi-search" style="color:var(--muted)"></i>
+            <input id="noteSearch" placeholder="Search notes…" />
+        </div>
+        <button class="btn btn-ghost btn-sm" id="newStickyBtn" type="button" title="Open a desktop sticky note"><i class="bi bi-window-plus"></i> New sticky</button>
+        <button class="btn btn-amber btn-sm" id="installBtn" type="button" style="display:none" title="Install worklog.today on your desktop"><i class="bi bi-download"></i> Install app</button>
+        <div class="app-user">
+            <span class="avatar" style="background:@Model.User.AvatarColor" title="@Model.User.FullName">@Initials(Model.User.FullName)</span>
+            <div style="line-height:1.1">
+                <div style="font-weight:600;font-size:14px">@Model.User.FullName</div>
+                <div style="font-size:12px;color:var(--muted)">@(Model.User.JobTitle ?? "Member")</div>
+            </div>
+            <form asp-controller="Account" asp-action="Logout" method="post" style="margin-left:6px">
+                <button type="submit" class="icon-btn" title="Sign out"><i class="bi bi-box-arrow-right"></i></button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="app-tabs">
+    <button class="app-tab active" data-tab="notes"><i class="bi bi-sticky"></i> Notes</button>
+    <button class="app-tab" data-tab="tasks"><i class="bi bi-list-check"></i> Daily Tasks</button>
+    <button class="app-tab" data-tab="timesheet"><i class="bi bi-calendar-week"></i> Timesheet</button>
+    <button class="app-tab" data-tab="reports"><i class="bi bi-bar-chart"></i> Reports</button>
+</div>
+
+<div class="app-body" data-from="@Model.WeekStart.ToString("yyyy-MM-dd")" data-to="@Model.WeekEnd.ToString("yyyy-MM-dd")" data-today="@DateTime.UtcNow.ToString("yyyy-MM-dd")">
+
+    <!-- NOTES -->
+    <section class="tab-pane active" id="pane-notes">
+        <div class="composer" id="composer">
+            <input class="ctitle" id="cTitle" placeholder="Title" />
+            <textarea class="cbody" id="cBody" placeholder="Take a note…" rows="1"></textarea>
+            <div class="ctools">
+                <div class="swatches" id="swatches">
+                    @foreach (var c in new[] { "#ffffff", "#fff8c5", "#d3f9d8", "#dbeafe", "#fbe4ff", "#ffe8cc", "#ffd6d6" })
+                    {
+                        <span class="sw @(c == "#ffffff" ? "active" : "")" style="background:@c" data-color="@c"></span>
+                    }
+                </div>
+                <button class="btn btn-ghost btn-sm" id="aiLabelBtn" type="button" title="Suggest labels with AI"><i class="bi bi-magic"></i> AI tags</button>
+                <input id="cLabels" class="input" style="flex:1;min-width:120px;padding:7px 10px" placeholder="labels (comma separated)" />
+                <button class="btn btn-amber btn-sm" id="saveNoteBtn" type="button"><i class="bi bi-check-lg"></i> Add</button>
+            </div>
+        </div>
+
+        <div id="pinnedWrap" style="@(Model.PinnedNotes.Any() ? "" : "display:none")">
+            <div class="notes-section-label"><i class="bi bi-pin-angle-fill"></i> Pinned</div>
+            <div class="masonry" id="pinnedNotes">
+                @foreach (var n in Model.PinnedNotes) { <partial name="_NoteCard" model="n" /> }
+            </div>
+        </div>
+
+        <div class="notes-section-label" id="othersLabel" style="@(Model.PinnedNotes.Any() && Model.OtherNotes.Any() ? "" : "display:none")">Others</div>
+        <div class="masonry" id="otherNotes">
+            @foreach (var n in Model.OtherNotes) { <partial name="_NoteCard" model="n" /> }
+        </div>
+        <div class="empty" id="notesEmpty" style="@((Model.PinnedNotes.Any() || Model.OtherNotes.Any()) ? "display:none" : "")">
+            <i class="bi bi-lightbulb"></i><p>Notes you add appear here. Start typing above!</p>
+        </div>
+    </section>
+
+    <!-- TASKS -->
+    <section class="tab-pane" id="pane-tasks">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px">
+            <div class="weeknav">
+                <a class="icon-btn" href="@Url.Action("Index", new { week = Model.WeekOffset - 1 })"><i class="bi bi-chevron-left"></i></a>
+                <strong>@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM yyyy")</strong>
+                <a class="icon-btn" href="@Url.Action("Index", new { week = Model.WeekOffset + 1 })"><i class="bi bi-chevron-right"></i></a>
+                @if (Model.WeekOffset != 0) { <a class="btn btn-ghost btn-sm" href="@Url.Action("Index")">This week</a> }
+            </div>
+            <button class="btn btn-amber btn-sm" id="addTaskBtn" type="button"><i class="bi bi-plus-lg"></i> Log a task</button>
+        </div>
+        <div class="card">
+            <div class="bd">
+                <table class="t" id="taskTable">
+                    <thead><tr><th>Date</th><th>Task</th><th>Project</th><th>Category</th><th>Status</th><th>Hours</th><th></th></tr></thead>
+                    <tbody id="taskBody">
+                    @foreach (var w in Model.WeekEntries)
+                    {
+                        <tr data-id="@w.Id" data-task="@w.Task" data-project="@w.Project" data-category="@((int)w.Category)" data-status="@((int)w.Status)" data-hours="@w.Hours" data-date="@w.Date.ToString("yyyy-MM-dd")" data-billable="@w.Billable.ToString().ToLower()" data-notes="@w.Notes">
+                            <td>@w.Date.ToString("ddd dd")</td>
+                            <td><strong>@w.Task</strong>@(w.Billable ? "" : " ")@(!w.Billable ? Html.Raw("<span class='pill p-other' style='font-size:10px'>non-billable</span>") : null)</td>
+                            <td>@(w.Project ?? "—")</td>
+                            <td><span class="pill @Cat(w.Category)">@w.Category</span></td>
+                            <td><span class="pill @Stat(w.Status)">@w.Status</span></td>
+                            <td><strong>@w.Hours.ToString("0.#")h</strong></td>
+                            <td style="text-align:right;white-space:nowrap">
+                                <button class="mini-btn editTask" type="button"><i class="bi bi-pencil"></i></button>
+                                <button class="mini-btn delTask" type="button"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+                <div class="empty" id="tasksEmpty" style="@(Model.WeekEntries.Any() ? "display:none" : "")">
+                    <i class="bi bi-clipboard-check"></i><p>No tasks logged this week. Click “Log a task”.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TIMESHEET -->
+    <section class="tab-pane" id="pane-timesheet">
+        <div class="stat-grid">
+            <div class="stat"><div class="v">@Model.TotalHours.ToString("0.#")</div><div class="l">Total hours</div></div>
+            <div class="stat"><div class="v">@Model.BillableHours.ToString("0.#")</div><div class="l">Billable hours</div></div>
+            <div class="stat"><div class="v">@Model.EntryCount</div><div class="l">Tasks logged</div></div>
+            <div class="stat"><div class="v">@Model.NoteCount</div><div class="l">Active notes</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:18px" class="ts-grid">
+            <div class="card">
+                <div class="hd"><strong>Daily breakdown</strong><span style="color:var(--muted);font-size:13px">@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM")</span></div>
+                <div class="bd" style="padding:16px">
+                    @{ var maxDay = days.Select(d => Model.WeekEntries.Where(e => e.Date == d).Sum(e => e.Hours)).DefaultIfEmpty(0).Max(); }
+                    @foreach (var d in days)
+                    {
+                        var hrs = Model.WeekEntries.Where(e => e.Date == d).Sum(e => e.Hours);
+                        var w = maxDay > 0 ? (int)(hrs / maxDay * 100) : 0;
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:11px">
+                            <div style="width:64px;font-size:13px;color:var(--muted)">@d.ToString("ddd dd")</div>
+                            <div class="bar" style="flex:1"><span style="width:@w%"></span></div>
+                            <div style="width:46px;text-align:right;font-weight:600;font-size:13px">@hrs.ToString("0.#")h</div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="card">
+                <div class="hd"><strong>By project</strong></div>
+                <div class="bd" style="padding:16px">
+                    @if (!Model.HoursByProject.Any()) { <div class="empty" style="padding:28px"><p>No data yet.</p></div> }
+                    @foreach (var kv in Model.HoursByProject.OrderByDescending(k => k.Value))
+                    {
+                        var w = maxProj > 0 ? (int)(kv.Value / maxProj * 100) : 0;
+                        <div style="margin-bottom:13px">
+                            <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:5px"><span>@kv.Key</span><strong>@kv.Value.ToString("0.#")h</strong></div>
+                            <div class="bar"><span style="width:@w%"></span></div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="ai-panel" style="margin-top:18px">
+            <div class="ai-head">
+                <span class="ai-badge"><i class="bi bi-magic"></i> AI</span>
+                <strong>Weekly status summary</strong>
+                <button class="btn btn-amber btn-sm" id="genSummaryBtn" type="button" style="margin-left:auto"><i class="bi bi-stars"></i> Generate summary</button>
+            </div>
+            <div style="color:var(--muted);font-size:13.5px">Turn this week's tasks into a ready-to-submit report. Uses your local Ollama model when available, otherwise an instant local engine.</div>
+            <div class="ai-out" id="aiOut"></div>
+            <div class="ai-source" id="aiSource"></div>
+            <div id="aiCopyWrap" style="display:none;margin-top:10px">
+                <button class="btn btn-ghost btn-sm" id="copySummaryBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="tab-pane" id="pane-reports">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px" class="ts-grid">
+            <div class="card"><div class="hd"><strong>Hours by category</strong></div><div class="bd" style="padding:16px" id="repCategory"><div class="empty" style="padding:28px"><p>Loading…</p></div></div></div>
+            <div class="card"><div class="hd"><strong>Hours by project</strong></div><div class="bd" style="padding:16px" id="repProject"><div class="empty" style="padding:28px"><p>Loading…</p></div></div></div>
+        </div>
+        <div class="card" style="margin-top:18px"><div class="hd"><strong>Daily hours (this week)</strong></div><div class="bd" style="padding:16px" id="repDay"></div></div>
+    </section>
+</div>
+
+<!-- Task modal -->
+<div class="modal-bg" id="taskModal">
+    <div class="modal">
+        <div class="mh"><span id="taskModalTitle">Log a task</span><button class="icon-btn" type="button" data-close>&times;</button></div>
+        <div class="mb">
+            <input type="hidden" id="tId" />
+            <div class="field"><label class="lbl">Task</label><input id="tTask" class="input" placeholder="What did you work on?" /></div>
+            <div class="row2">
+                <div class="field"><label class="lbl">Project</label><input id="tProject" class="input" placeholder="Project / client" /></div>
+                <div class="field"><label class="lbl">Date</label><input id="tDate" type="date" class="input" /></div>
+            </div>
+            <div class="row2">
+                <div class="field"><label class="lbl">Category</label><select id="tCategory" class="input">
+                    @foreach (var c in Enum.GetValues<WorkCategory>()) { <option value="@((int)c)">@c</option> }
+                </select></div>
+                <div class="field"><label class="lbl">Status</label><select id="tStatus" class="input">
+                    @foreach (var s in Enum.GetValues<WorkStatus>()) { <option value="@((int)s)">@s</option> }
+                </select></div>
+            </div>
+            <div class="row2">
+                <div class="field"><label class="lbl">Hours</label><input id="tHours" type="number" step="0.25" min="0" max="24" class="input" value="1" /></div>
+                <div class="field" style="display:flex;align-items:flex-end;gap:8px;padding-bottom:4px"><input id="tBillable" type="checkbox" checked style="width:16px;height:16px" /><label class="lbl" style="margin:0">Billable</label></div>
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="saveTaskBtn"><i class="bi bi-check-lg"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Note edit modal -->
+<div class="modal-bg" id="noteModal">
+    <div class="modal">
+        <div class="mh"><span>Edit note</span><button class="icon-btn" type="button" data-close>&times;</button></div>
+        <div class="mb">
+            <input type="hidden" id="nId" />
+            <div class="field"><label class="lbl">Title</label><input id="nTitle" class="input" /></div>
+            <div class="field"><label class="lbl">Note</label><textarea id="nBody" class="input" rows="5"></textarea></div>
+            <div class="field"><label class="lbl">Labels</label><input id="nLabels" class="input" placeholder="comma separated" /></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="saveNoteEditBtn"><i class="bi bi-check-lg"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+@section Scripts {
+    <script src="~/js/app.js" asp-append-version="true"></script>
+}

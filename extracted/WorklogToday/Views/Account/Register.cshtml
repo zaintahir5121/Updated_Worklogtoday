@@ -1,0 +1,64 @@
+@model RegisterViewModel
+@{
+    ViewData["Title"] = "Create your account · worklog.today";
+    ViewData["Description"] = "Create a free worklog.today account.";
+}
+<div class="auth-wrap">
+    <aside class="auth-aside">
+        <a class="logo" href="/" style="color:#fff"><span class="mark"><i class="bi bi-journal-text"></i></span>worklog<span style="color:var(--amber)">.today</span></a>
+        <div>
+            <h2>Start capturing your work in seconds.</h2>
+            <p>Free to start. No credit card. Your notes, tasks and timesheets — all in one calm, fast workspace.</p>
+            <div class="pts">
+                <div><i class="bi bi-check-circle-fill"></i> Unlimited notes & tasks</div>
+                <div><i class="bi bi-check-circle-fill"></i> Automatic weekly timesheets</div>
+                <div><i class="bi bi-check-circle-fill"></i> AI summaries & reports</div>
+            </div>
+        </div>
+        <div style="color:#94a3b8;font-size:13px">It takes less than a minute.</div>
+    </aside>
+    <main class="auth-main">
+        <div class="auth-card">
+            <h1>Create account</h1>
+            <p class="muted">Your personal work workspace, ready in seconds.</p>
+            <form asp-action="Register" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
+                <div asp-validation-summary="ModelOnly" class="val-err"></div>
+                <div class="field">
+                    <label asp-for="FullName"></label>
+                    <input asp-for="FullName" class="input" placeholder="Alex Rivera" autofocus />
+                    <span asp-validation-for="FullName" class="val-err"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="Email"></label>
+                    <input asp-for="Email" class="input" placeholder="you@company.com" />
+                    <span asp-validation-for="Email" class="val-err"></span>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label asp-for="JobTitle"></label>
+                        <input asp-for="JobTitle" class="input" placeholder="Engineer" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="Company"></label>
+                        <input asp-for="Company" class="input" placeholder="Acme Corp" />
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label asp-for="Password"></label>
+                        <input asp-for="Password" class="input" placeholder="6+ characters" />
+                        <span asp-validation-for="Password" class="val-err"></span>
+                    </div>
+                    <div class="field">
+                        <label asp-for="ConfirmPassword"></label>
+                        <input asp-for="ConfirmPassword" class="input" placeholder="Repeat" />
+                        <span asp-validation-for="ConfirmPassword" class="val-err"></span>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-amber" style="width:100%;justify-content:center"><i class="bi bi-rocket-takeoff"></i> Create my account</button>
+            </form>
+            <p class="muted" style="margin-top:18px;text-align:center">Already have an account? <a asp-action="Login" style="color:var(--amber-2);font-weight:600;text-decoration:none">Sign in</a></p>
+        </div>
+    </main>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

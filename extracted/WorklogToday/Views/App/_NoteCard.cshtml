@@ -1,0 +1,26 @@
+@model Note
+<div class="note @(Model.IsPinned ? "pinned" : "")" data-id="@Model.Id" data-color="@Model.ColorHex" data-labels="@Model.Labels" style="background:@Model.ColorHex">
+    <button class="mini-btn pin @(Model.IsPinned ? "on" : "")" type="button" data-act="pin" title="Pin">
+        <i class="bi @(Model.IsPinned ? "bi-pin-angle-fill" : "bi-pin-angle")"></i>
+    </button>
+    @if (!string.IsNullOrWhiteSpace(Model.Title))
+    {
+        <h4 class="ntitle">@Model.Title</h4>
+    }
+    <div class="ntext">@Model.Content</div>
+    @if (!string.IsNullOrWhiteSpace(Model.Labels))
+    {
+        <div class="nlabels">
+            @foreach (var l in Model.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                <span class="nlabel">@l</span>
+            }
+        </div>
+    }
+    <div class="nactions">
+        <button class="mini-btn" type="button" data-act="popout" title="Pop out as desktop sticky"><i class="bi bi-window-stack"></i></button>
+        <button class="mini-btn" type="button" data-act="edit" title="Edit"><i class="bi bi-pencil"></i></button>
+        <button class="mini-btn" type="button" data-act="archive" title="Archive"><i class="bi bi-archive"></i></button>
+        <button class="mini-btn" type="button" data-act="delete" title="Delete"><i class="bi bi-trash"></i></button>
+    </div>
+</div>

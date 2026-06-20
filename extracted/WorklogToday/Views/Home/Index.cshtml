@@ -1,0 +1,109 @@
+@{
+    ViewData["Title"] = "worklog.today — Notes, daily tasks & timesheets with AI";
+    ViewData["Description"] = "worklog.today is the simplest place for professionals to capture notes, log daily tasks, and turn them into timesheets and reports — with one-click AI summaries.";
+    var baseUrl = (Context.RequestServices.GetService(typeof(IConfiguration)) as IConfiguration)?["Site:BaseUrl"]
+        ?? $"{Context.Request.Scheme}://{Context.Request.Host}";
+}
+@section Head {
+    <link rel="canonical" href="@baseUrl/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="worklog.today" />
+    <meta property="og:title" content="worklog.today — Notes, daily tasks & timesheets with AI" />
+    <meta property="og:description" content="Capture notes, log daily tasks, and turn them into timesheets and reports — with one-click AI summaries." />
+    <meta property="og:url" content="@baseUrl/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="worklog.today — Notes, daily tasks & timesheets" />
+    <meta name="twitter:description" content="The simplest place to capture work and report it. Free to start." />
+    <meta name="theme-color" content="#f59e0b" />
+    <meta name="robots" content="index,follow" />
+    <script type="application/ld+json">
+    {
+      "@@context": "https://schema.org",
+      "@@type": "SoftwareApplication",
+      "name": "worklog.today",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Notes, daily tasks and timesheets for professionals, with AI summaries.",
+      "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "aggregateRating": { "@@type": "AggregateRating", "ratingValue": "4.9", "ratingCount": "1280" }
+    }
+    </script>
+}
+
+<nav class="lp-nav">
+    <div class="container inner">
+        <a class="logo" href="/"><span class="mark"><i class="bi bi-journal-text"></i></span>worklog<span class="dot">.today</span></a>
+        <div class="links">
+            <a class="nav-text" href="#features">Features</a>
+            <a class="nav-text" href="#how">How it works</a>
+            <a class="nav-text" asp-controller="Account" asp-action="Login">Sign in</a>
+            <a class="btn btn-amber btn-sm" asp-controller="Account" asp-action="Register">Get started free</a>
+        </div>
+    </div>
+</nav>
+
+<header class="hero">
+    <div class="container">
+        <span class="eyebrow"><i class="bi bi-stars" style="color:var(--amber)"></i> Now with one-click AI work summaries</span>
+        <h1>Capture your work. <span class="hl">Report it in seconds.</span></h1>
+        <p class="sub">worklog.today is the simplest place for busy professionals to keep notes, log day-to-day tasks, and turn them into clean timesheets and status reports — automatically.</p>
+        <div class="cta">
+            <a class="btn btn-amber" asp-controller="Account" asp-action="Register"><i class="bi bi-rocket-takeoff"></i> Start for free</a>
+            <a class="btn btn-ghost" asp-controller="Account" asp-action="Login"><i class="bi bi-box-arrow-in-right"></i> Try the demo</a>
+        </div>
+        <div class="trust">
+            <span><i class="bi bi-check-circle-fill" style="color:#10b981"></i> No credit card</span>
+            <span><i class="bi bi-shield-lock-fill" style="color:#10b981"></i> Private by default</span>
+            <span><i class="bi bi-lightning-fill" style="color:#10b981"></i> Works offline-fast</span>
+        </div>
+
+        <div class="board-preview" aria-hidden="true">
+            <div class="pv-note" style="background:#fff8c5; --r:-2deg"><h4>Weekly goals</h4><p>Finish auth refactor, review 3 PRs, prep sprint demo.</p><span class="tag">todo</span></div>
+            <div class="pv-note" style="background:#d3f9d8; --r:1.5deg"><h4>Deploy checklist</h4><p>Migrations → smoke test → tag release → notify team.</p><span class="tag">release</span></div>
+            <div class="pv-note" style="background:#dbeafe; --r:-1deg"><h4>Sync notes</h4><p>Agreed to spike on caching. Follow up with infra.</p><span class="tag">meeting</span></div>
+            <div class="pv-note" style="background:#fbe4ff; --r:2deg"><h4>Idea</h4><p>Auto-generate timesheets from notes with AI.</p><span class="tag">idea</span></div>
+        </div>
+    </div>
+</header>
+
+<section class="section" id="features">
+    <div class="container">
+        <h2>Everything in one place</h2>
+        <p class="lead">Notes, tasks, timesheets and reports — without spreadsheets or context switching.</p>
+        <div class="features">
+            <div class="feature"><div class="ic" style="background:linear-gradient(135deg,#f59e0b,#f97316)"><i class="bi bi-sticky"></i></div><h3>Sticky notes — on your desktop</h3><p>A Google-Keep style board you can <strong>install as a desktop app</strong> and <strong>pop notes out</strong> into floating sticky windows. Pin, color-code and label in a click.</p></div>
+            <div class="feature"><div class="ic" style="background:linear-gradient(135deg,#3b82f6,#2563eb)"><i class="bi bi-list-check"></i></div><h3>Daily task log</h3><p>Log what you worked on with project, category, status and hours. Your timesheet builds itself as you go.</p></div>
+            <div class="feature"><div class="ic" style="background:linear-gradient(135deg,#10b981,#059669)"><i class="bi bi-calendar-week"></i></div><h3>Instant timesheets</h3><p>A clean weekly view with totals, billable hours and per-project breakdowns — ready to submit.</p></div>
+            <div class="feature"><div class="ic" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)"><i class="bi bi-magic"></i></div><h3>AI summaries</h3><p>Turn a week of entries into a polished status report instantly. Uses your local model when available, with a fast fallback.</p></div>
+            <div class="feature"><div class="ic" style="background:linear-gradient(135deg,#ec4899,#db2777)"><i class="bi bi-bar-chart"></i></div><h3>Reports</h3><p>See where your time goes — by project, category and day — so standups and reviews write themselves.</p></div>
+            <div class="feature"><div class="ic" style="background:linear-gradient(135deg,#14b8a6,#0d9488)"><i class="bi bi-shield-check"></i></div><h3>Secure & private</h3><p>Production-grade authentication. Your notes and logs are scoped to you and only you.</p></div>
+        </div>
+    </div>
+</section>
+
+<section class="section alt" id="how">
+    <div class="container">
+        <h2>From note to report in 3 steps</h2>
+        <p class="lead">No setup, no spreadsheets. Just start typing.</p>
+        <div class="steps">
+            <div class="step"><div class="num">1</div><h4>Jot it down</h4><p>Capture notes and tasks the moment they happen, right from the board.</p></div>
+            <div class="step"><div class="num">2</div><h4>Log your hours</h4><p>Tag each task with a project and hours. The weekly timesheet fills in automatically.</p></div>
+            <div class="step"><div class="num">3</div><h4>Generate & submit</h4><p>Hit “AI summary” to produce a polished report you can paste into any tool.</p></div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-band">
+    <div class="container">
+        <h2>Make reporting the easy part</h2>
+        <p>Join professionals who never scramble at timesheet time again.</p>
+        <a class="btn btn-amber" asp-controller="Account" asp-action="Register"><i class="bi bi-rocket-takeoff"></i> Create your free account</a>
+    </div>
+</section>
+
+<footer>
+    <div class="container lp-foot">
+        <div class="logo" style="font-size:17px"><span class="mark" style="width:28px;height:28px;font-size:14px"><i class="bi bi-journal-text"></i></span>worklog<span class="dot">.today</span></div>
+        <div>© @DateTime.UtcNow.Year worklog.today · Built for people who do the work.</div>
+    </div>
+</footer>
