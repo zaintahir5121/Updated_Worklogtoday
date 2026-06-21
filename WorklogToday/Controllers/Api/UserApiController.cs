@@ -7,6 +7,7 @@ namespace WorklogToday.Controllers.Api;
 
 [Authorize]
 [ApiController]
+[IgnoreAntiforgeryToken]
 [Route("api/user")]
 public class UserApiController : ControllerBase
 {

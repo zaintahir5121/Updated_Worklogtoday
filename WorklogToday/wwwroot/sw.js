@@ -1,5 +1,5 @@
 // worklog.today service worker — app-shell cache + offline fallback.
-const CACHE = 'worklog-v1';
+const CACHE = 'worklog-v3';
 const SHELL = [
   '/css/site.css',
   '/js/app.js',
@@ -15,32 +15,44 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET') return; // never cache mutations / API writes
+
+  // Never intercept non-GET (POST/PUT/DELETE API calls go straight to network)
+  if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for navigations & API, fall back to cache when offline.
+  // Always network-first for navigations and API calls.
+  // This ensures the anti-forgery token in the page is always fresh,
+  // and API responses are never stale.
   if (req.mode === 'navigate' || url.pathname.startsWith('/api/')) {
     e.respondWith(
-      fetch(req).catch(() => caches.match(req).then(r => r || caches.match('/app')))
+      fetch(req).catch(() =>
+        caches.match(req).then(r => r || caches.match('/app'))
+      )
     );
     return;
   }
 
-  // Cache-first for static shell assets.
+  // Cache-first for versioned static shell assets (css/js have asp-append-version).
   e.respondWith(
-    caches.match(req).then(cached => cached || fetch(req).then(resp => {
-      const copy = resp.clone();
-      caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
-      return resp;
-    }).catch(() => cached))
+    caches.match(req).then(cached => {
+      if (cached) return cached;
+      return fetch(req).then(resp => {
+        if (resp.ok) {
+          const copy = resp.clone();
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+        }
+        return resp;
+      });
+    })
   );
 });

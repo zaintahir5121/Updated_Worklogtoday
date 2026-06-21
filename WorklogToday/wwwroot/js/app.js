@@ -312,60 +312,64 @@
         autoSaveTimer = setTimeout(() => saveNoteInline(card, true), 1500);
     }
 
-    // Click on card body → open inline edit
-    document.addEventListener('click', e => {
-        const card = e.target.closest('.note');
-        if (!card) { if (activeCard) closeNoteInline(activeCard); return; }
-
-        // Don't intercept action buttons
-        const btn = e.target.closest('[data-act]');
-        if (btn) return;
-
-        openNoteInline(card);
-    });
-
     // Auto-save on typing inside an open card
     document.addEventListener('input', e => {
         const card = e.target.closest('.note.note-open');
         if (card) scheduleAutoSave(card);
     });
 
-    // Color swatch click inside card
+    // Single click handler for all note interactions
     document.addEventListener('click', async e => {
-        const swatch = e.target.closest('.note .nsw');
-        if (!swatch) return;
-        const card = swatch.closest('.note');
-        const color = swatch.dataset.color;
-        card.style.background = color;
-        card.dataset.color = color;
-        card.querySelectorAll('.nsw').forEach(s => s.classList.toggle('active', s.dataset.color === color));
-        scheduleAutoSave(card);
-    });
+        const card = e.target.closest('.note');
 
-    // Note action buttons (event delegation)
-    document.addEventListener('click', async e => {
-        const btn = e.target.closest('.note [data-act]'); if (!btn) return;
-        const card = btn.closest('.note'); const id = card.dataset.id; const act = btn.dataset.act;
-        try {
-            if (act === 'close') {
-                await closeNoteInline(card);
-            } else if (act === 'pin') {
-                const n = await api('POST', `/api/notes/${id}/pin`);
-                card.remove(); addNoteToDom(n, true);
-                toast(n.isPinned ? 'Pinned' : 'Unpinned');
-            } else if (act === 'archive') {
-                await api('POST', `/api/notes/${id}/archive`);
-                card.remove(); refreshSections(); toast('Archived');
-            } else if (act === 'delete') {
-                if (!confirm('Delete this note?')) return;
-                await api('DELETE', `/api/notes/${id}`);
-                card.remove(); refreshSections(); toast('Deleted');
-            } else if (act === 'popout') {
-                openSticky(id);
-            } else if (act === 'extract') {
-                openExtractModal(id, btn);
-            }
-        } catch (err) { toast(err.message); }
+        // Click outside any card — close active
+        if (!card) {
+            if (activeCard) closeNoteInline(activeCard);
+            return;
+        }
+
+        // Color swatch
+        const swatch = e.target.closest('.nsw');
+        if (swatch) {
+            const color = swatch.dataset.color;
+            card.style.background = color;
+            card.dataset.color = color;
+            card.querySelectorAll('.nsw').forEach(s => s.classList.toggle('active', s.dataset.color === color));
+            scheduleAutoSave(card);
+            return;
+        }
+
+        // Action buttons
+        const btn = e.target.closest('[data-act]');
+        if (btn) {
+            const id = card.dataset.id;
+            const act = btn.dataset.act;
+            try {
+                if (act === 'close') {
+                    await closeNoteInline(card);
+                } else if (act === 'pin') {
+                    await closeNoteInline(card);
+                    const n = await api('POST', `/api/notes/${id}/pin`);
+                    card.remove(); addNoteToDom(n, true);
+                    toast(n.isPinned ? 'Pinned' : 'Unpinned');
+                } else if (act === 'archive') {
+                    await api('POST', `/api/notes/${id}/archive`);
+                    card.remove(); refreshSections(); toast('Archived');
+                } else if (act === 'delete') {
+                    if (!confirm('Delete this note?')) return;
+                    await api('DELETE', `/api/notes/${id}`);
+                    card.remove(); refreshSections(); toast('Deleted');
+                } else if (act === 'popout') {
+                    openSticky(id);
+                } else if (act === 'extract') {
+                    openExtractModal(id, btn);
+                }
+            } catch (err) { toast(err.message); }
+            return;
+        }
+
+        // Click on card body → open inline edit
+        openNoteInline(card);
     });
 
     // Escape key closes active card
@@ -726,6 +730,9 @@
         const modal = $('#eodModal');
         setTimeout(() => modal && modal.classList.add('open'), 1500);
 
+        // Mark as seen whenever modal is dismissed (save or skip)
+        const markSeen = () => localStorage.setItem(eodKey, '1');
+
         $('#saveEodBtn').addEventListener('click', async () => {
             const task = $('#eodTask').value.trim();
             if (!task) return toast('Add at least a task description');
@@ -740,17 +747,15 @@
                     status: 2,
                     billable: true
                 });
-                localStorage.setItem(eodKey, '1');
+                markSeen();
                 modal.classList.remove('open');
                 toast('Logged! Great work today 🎉');
                 setTimeout(() => location.reload(), 800);
             } catch (e) { toast('⚠ ' + e.message); }
         });
 
-        $$('[data-close]', modal).forEach(b => b.addEventListener('click', () => {
-            localStorage.setItem(eodKey, '1'); // skip today if dismissed
-            modal.classList.remove('open');
-        }));
+        // Skip today — mark seen so it won't reappear; global data-close closes the modal
+        $$('[data-close]', modal).forEach(b => b.addEventListener('click', markSeen));
     })();
 
     // ---------- Settings modal ----------

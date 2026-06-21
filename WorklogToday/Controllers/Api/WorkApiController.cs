@@ -10,7 +10,7 @@ namespace WorklogToday.Controllers.Api;
 
 [ApiController]
 [Authorize]
-[AutoValidateAntiforgeryToken]
+[IgnoreAntiforgeryToken]
 [Route("api/work")]
 public class WorkApiController : ControllerBase
 {
