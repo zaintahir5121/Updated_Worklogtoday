@@ -182,13 +182,39 @@
     // ---------- Composer ----------
     const composer = $('#composer'), cTitle = $('#cTitle'), cBody = $('#cBody'), cLabels = $('#cLabels');
     let curColor = '#ffffff';
+    let composerSaving = false;
+
     function expand() { composer.classList.add('expanded'); }
-    function collapse() {
-        if (!cTitle.value && !cBody.value && !cLabels.value) { composer.classList.remove('expanded'); }
+
+    async function collapseAndSave() {
+        if (composerSaving) return;
+        if (!cTitle.value && !cBody.value) {
+            // Nothing typed — just collapse
+            composer.classList.remove('expanded');
+            return;
+        }
+        composerSaving = true;
+        try {
+            const note = await api('POST', '/api/notes', { title: cTitle.value, content: cBody.value, colorHex: curColor, labels: cLabels.value });
+            addNoteToDom(note, true);
+            cTitle.value = cBody.value = cLabels.value = '';
+            cBody.style.height = 'auto'; curColor = '#ffffff'; composer.style.background = '';
+            $$('#swatches .sw').forEach(s => s.classList.toggle('active', s.dataset.color === '#ffffff'));
+            composer.classList.remove('expanded');
+            $('#notesEmpty').style.display = 'none';
+        } catch (e) { toast(e.message); }
+        finally { composerSaving = false; }
     }
+
     cBody.addEventListener('focus', expand);
+    cTitle.addEventListener('focus', expand);
     cBody.addEventListener('input', () => { cBody.style.height = 'auto'; cBody.style.height = cBody.scrollHeight + 'px'; });
-    document.addEventListener('click', e => { if (!composer.contains(e.target)) collapse(); });
+    document.addEventListener('click', e => { if (!composer.contains(e.target)) collapseAndSave(); });
+    // Escape key closes composer and saves
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && composer.classList.contains('expanded') && !activeCard) collapseAndSave();
+    });
+
     $('#swatches').addEventListener('click', e => {
         const sw = e.target.closest('.sw'); if (!sw) return;
         curColor = sw.dataset.color;
@@ -204,20 +230,6 @@
             cLabels.value = r.labels; toast('Smart AI tagged your note');
         } catch (e) { toast(e.message); }
         finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-magic"></i> AI tags'; }
-    });
-
-    $('#saveNoteBtn').addEventListener('click', async () => {
-        if (!cBody.value && !cTitle.value) return toast('Empty note');
-        try {
-            const note = await api('POST', '/api/notes', { title: cTitle.value, content: cBody.value, colorHex: curColor, labels: cLabels.value });
-            addNoteToDom(note, true);
-            cTitle.value = cBody.value = cLabels.value = '';
-            cBody.style.height = 'auto'; curColor = '#ffffff'; composer.style.background = '';
-            $$('#swatches .sw').forEach(s => s.classList.toggle('active', s.dataset.color === '#ffffff'));
-            composer.classList.remove('expanded');
-            $('#notesEmpty').style.display = 'none';
-            toast('Note added');
-        } catch (e) { toast(e.message); }
     });
 
     const COLORS = ["#ffffff","#fff8c5","#d3f9d8","#dbeafe","#fbe4ff","#ffe8cc","#ffd6d6"];
