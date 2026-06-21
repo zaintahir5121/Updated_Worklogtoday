@@ -336,14 +336,27 @@ table.t tbody tr:hover { background:var(--soft); }
     .hero h1 { font-size:clamp(28px, 8vw, 48px); }
     .lp-nav .links a:not(.btn) { display:none; }
 
+    /* ══════════════════════════════════════════════
+       MOBILE APP SHELL — native feel
+       ══════════════════════════════════════════════ */
+
     /* Hide desktop tabs — replaced by bottom nav */
     .app-tabs { display:none; }
 
-    /* App top bar — compact Keep-style */
-    .app-top { position:fixed; top:0; left:0; right:0; z-index:40; }
+    /* App top bar — fixed, compact, glassy */
+    .app-top {
+        position:fixed;
+        top:0; left:0; right:0;
+        z-index:40;
+        background:rgba(255,255,255,.95);
+        backdrop-filter:blur(12px);
+        -webkit-backdrop-filter:blur(12px);
+        border-bottom:1px solid rgba(0,0,0,.08);
+        padding-top:env(safe-area-inset-top);
+    }
     .app-top .inner {
         padding:0 12px;
-        height:56px;
+        height:52px;
         gap:8px;
     }
     .app-top .logo { font-size:16px; }
@@ -356,7 +369,7 @@ table.t tbody tr:hover { background:var(--soft); }
         border-radius:24px;
         background:#f1f3f4;
         border-color:transparent;
-        height:40px;
+        height:38px;
     }
     .app-search input { font-size:14px; }
     .bmc-btn { display:none; }
@@ -364,11 +377,40 @@ table.t tbody tr:hover { background:var(--soft); }
     .btn-label { display:none; }
     .tab-label { display:none; }
 
-    /* Body — space for fixed top bar + bottom nav */
+    /* App body — full bleed, sliding tabs container */
     .app-body {
-        padding: 72px 12px 88px;
+        padding:0;
+        padding-top:calc(52px + env(safe-area-inset-top));
+        padding-bottom:calc(64px + env(safe-area-inset-bottom));
         max-width:100%;
+        overflow:hidden;
+        position:relative;
     }
+
+    /* Tab pane slide transitions */
+    .tab-pane {
+        display:block !important;     /* always in DOM for swipe */
+        position:absolute;
+        top:0; left:0; right:0;
+        min-height:100%;
+        padding:14px 14px 24px;
+        box-sizing:border-box;
+        opacity:0;
+        pointer-events:none;
+        transform:translateX(100%);
+        transition:transform .28s cubic-bezier(.4,0,.2,1), opacity .28s;
+        will-change:transform;
+        overflow-y:auto;
+        -webkit-overflow-scrolling:touch;
+    }
+    .tab-pane.active {
+        opacity:1;
+        pointer-events:auto;
+        transform:translateX(0);
+        position:relative;           /* back to flow so body grows */
+    }
+    .tab-pane.slide-left  { transform:translateX(-40%); opacity:0; pointer-events:none; }
+    .tab-pane.slide-right { transform:translateX(100%); opacity:0; pointer-events:none; }
 
     /* ── Notes tab — Keep-style 2-col masonry ── */
     .masonry { columns: 2; column-gap:10px; }
@@ -393,13 +435,13 @@ table.t tbody tr:hover { background:var(--soft); }
     /* Composer — collapsed by default, full width */
     .composer {
         max-width:100%;
-        margin:0 0 16px;
-        border-radius:24px;
+        margin:0 0 14px;
+        border-radius:20px;
         border:1px solid rgba(0,0,0,.12);
-        box-shadow: 0 1px 3px rgba(0,0,0,.1);
+        box-shadow: 0 2px 8px rgba(0,0,0,.08);
         padding:12px 16px;
     }
-    .composer.expanded { border-radius:12px; }
+    .composer.expanded { border-radius:14px; }
     .composer .cbody { font-size:14px; }
     .notes-section-label { font-size:10px; margin:4px 2px 10px; }
 
@@ -579,4 +621,68 @@ table.t tbody tr:hover { background:var(--soft); }
 @media (max-width: 768px) {
     .testimonials { grid-template-columns: 1fr; }
     .hero-stats { max-width: 100%; }
+}
+
+/* ── Pull-to-refresh indicator ── */
+#ptr {
+    display:none;
+    position:fixed;
+    top:-48px;
+    left:50%;
+    transform:translateX(-50%);
+    width:40px; height:40px;
+    background:var(--amber);
+    border-radius:50%;
+    color:#fff;
+    font-size:20px;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    transition:transform .2s;
+    box-shadow:0 4px 12px rgba(245,158,11,.4);
+}
+@media (max-width:640px) {
+    #ptr { display:flex; }
+    @keyframes spin { to { transform:translateX(-50%) rotate(360deg); } }
+    #ptr.spinning { animation:spin .4s linear; }
+
+    /* Nudge banner — below fixed top bar on mobile */
+    .nudge-banner {
+        top:calc(52px + env(safe-area-inset-top));
+        font-size:13px;
+        padding:10px 14px;
+        gap:8px;
+    }
+
+    /* Slide tab transitions need a min-height so panes don't collapse */
+    .app-body { min-height:calc(100dvh - 52px - 64px); }
+}
+
+/* ── Swipe tab indicator dots (mobile only) ── */
+.tab-dots {
+    display:none;
+}
+@media (max-width:640px) {
+    .tab-dots {
+        display:flex;
+        justify-content:center;
+        gap:6px;
+        padding:8px 0 2px;
+        position:sticky;
+        top:calc(52px + env(safe-area-inset-top));
+        z-index:35;
+        background:transparent;
+        pointer-events:none;
+    }
+    .tab-dot {
+        width:6px; height:6px;
+        border-radius:50%;
+        background:var(--line);
+        transition:.2s;
+    }
+    .tab-dot.active {
+        width:18px;
+        border-radius:3px;
+        background:var(--amber);
+    }
 }

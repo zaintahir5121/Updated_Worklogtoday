@@ -45,6 +45,12 @@
     <button class="app-tab" data-tab="timesheet"><i class="bi bi-calendar-week"></i> <span class="tab-label">Timesheet</span></button>
     <button class="app-tab" data-tab="reports"><i class="bi bi-bar-chart"></i> <span class="tab-label">Reports</span></button>
 </div>
+<div class="tab-dots" id="tabDots">
+    <span class="tab-dot active" data-tab="notes"></span>
+    <span class="tab-dot" data-tab="tasks"></span>
+    <span class="tab-dot" data-tab="timesheet"></span>
+    <span class="tab-dot" data-tab="reports"></span>
+</div>
 
 <div class="app-body" data-from="@Model.WeekStart.ToString("yyyy-MM-dd")" data-to="@Model.WeekEnd.ToString("yyyy-MM-dd")" data-today="@DateTime.UtcNow.ToString("yyyy-MM-dd")">
 

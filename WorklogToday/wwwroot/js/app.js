@@ -27,22 +27,127 @@
         clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), dur);
     }
 
-    // ---------- Tabs ----------
-    function activateTab(name) {
+    // ---------- Tabs with slide animation ----------
+    const TAB_ORDER = ['notes', 'tasks', 'timesheet', 'reports'];
+    let currentTab = 'notes';
+
+    function activateTab(name, direction) {
+        const isMobile = window.innerWidth <= 640;
+        const prev = currentTab;
+        currentTab = name;
+
         $$('.app-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
         $$('.bottom-nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-        $$('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + name));
         localStorage.setItem('wt_tab', name);
         if (name === 'reports') loadReports();
-        // FAB: show on notes, hide on others
+
         const fab = $('#mobileFab');
         if (fab) fab.style.display = name === 'notes' ? '' : 'none';
+
+        // Update swipe indicator dots
+        $$('.tab-dot').forEach(d => d.classList.toggle('active', d.dataset.tab === name));
+
+        if (isMobile && prev !== name) {
+            // determine slide direction
+            const fromIdx = TAB_ORDER.indexOf(prev);
+            const toIdx = TAB_ORDER.indexOf(name);
+            const goingRight = (direction === 'right') || (direction === undefined && toIdx > fromIdx);
+
+            $$('.tab-pane').forEach(p => {
+                const pName = p.id.replace('pane-', '');
+                p.classList.remove('active', 'slide-left', 'slide-right');
+                if (pName === name) {
+                    // new pane: start offscreen in direction of travel
+                    p.style.transition = 'none';
+                    p.classList.add(goingRight ? 'slide-right' : 'slide-left');
+                    // force reflow then animate in
+                    p.offsetHeight;
+                    p.style.transition = '';
+                    p.classList.remove('slide-left', 'slide-right');
+                    p.classList.add('active');
+                } else if (pName === prev) {
+                    // old pane: slide out opposite direction
+                    p.classList.add(goingRight ? 'slide-left' : 'slide-right');
+                }
+            });
+        } else {
+            $$('.tab-pane').forEach(p => {
+                p.classList.remove('slide-left', 'slide-right');
+                p.classList.toggle('active', p.id === 'pane-' + name);
+            });
+        }
     }
+
     $$('.app-tab').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
     $$('.bottom-nav-item').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
     const urlTab = new URLSearchParams(location.search).get('tab');
     const savedTab = urlTab || localStorage.getItem('wt_tab');
-    if (savedTab && $('#pane-' + savedTab)) activateTab(savedTab);
+    currentTab = (savedTab && TAB_ORDER.includes(savedTab)) ? savedTab : 'notes';
+    activateTab(currentTab);
+
+    // ---------- Swipe between tabs (mobile) ----------
+    (function () {
+        let startX = 0, startY = 0, startTime = 0;
+        const appBody = $('.app-body');
+        if (!appBody) return;
+
+        appBody.addEventListener('touchstart', e => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            startTime = Date.now();
+        }, { passive: true });
+
+        appBody.addEventListener('touchend', e => {
+            if (window.innerWidth > 640) return;
+            const dx = e.changedTouches[0].clientX - startX;
+            const dy = e.changedTouches[0].clientY - startY;
+            const dt = Date.now() - startTime;
+
+            // Ignore slow swipes, vertical scrolls, tiny swipes
+            if (dt > 400 || Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx) * 0.9) return;
+
+            const idx = TAB_ORDER.indexOf(currentTab);
+            if (dx < 0 && idx < TAB_ORDER.length - 1) {
+                // swipe left → next tab
+                activateTab(TAB_ORDER[idx + 1], 'right');
+            } else if (dx > 0 && idx > 0) {
+                // swipe right → prev tab
+                activateTab(TAB_ORDER[idx - 1], 'left');
+            }
+        }, { passive: true });
+    })();
+
+    // ---------- Pull-to-refresh (mobile) ----------
+    (function () {
+        let startY = 0, pulling = false;
+        const ptr = document.createElement('div');
+        ptr.id = 'ptr';
+        ptr.innerHTML = '<i class="bi bi-arrow-clockwise"></i>';
+        document.body.prepend(ptr);
+
+        document.addEventListener('touchstart', e => {
+            if (window.innerWidth > 640) return;
+            startY = e.touches[0].clientY;
+            pulling = window.scrollY === 0;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', e => {
+            if (!pulling || window.innerWidth > 640) return;
+            const dy = e.touches[0].clientY - startY;
+            if (dy > 0) ptr.style.transform = `translateY(${Math.min(dy * 0.4, 56)}px)`;
+        }, { passive: true });
+
+        document.addEventListener('touchend', e => {
+            if (!pulling || window.innerWidth > 640) return;
+            const dy = e.changedTouches[0].clientY - startY;
+            ptr.style.transform = '';
+            pulling = false;
+            if (dy > 80) {
+                ptr.classList.add('spinning');
+                setTimeout(() => { ptr.classList.remove('spinning'); location.reload(); }, 400);
+            }
+        }, { passive: true });
+    })();
 
     // ---------- Mobile FAB ----------
     const mobileFab = $('#mobileFab');
