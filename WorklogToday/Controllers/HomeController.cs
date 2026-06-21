@@ -55,6 +55,33 @@ public class HomeController : Controller
     [Route("terms")]
     public IActionResult Terms() => View();
 
+    [Route("badge.svg")]
+    [ResponseCache(Duration = 86400, Location = ResponseCacheLocation.Any)]
+    public IActionResult Badge()
+    {
+        const string svg = """
+            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="176" height="20">
+              <linearGradient id="s" x2="0" y2="100%">
+                <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+                <stop offset="1" stop-opacity=".1"/>
+              </linearGradient>
+              <clipPath id="r"><rect width="176" height="20" rx="3" fill="#fff"/></clipPath>
+              <g clip-path="url(#r)">
+                <rect width="100" height="20" fill="#555"/>
+                <rect x="100" width="76" height="20" fill="#f59e0b"/>
+                <rect width="176" height="20" fill="url(#s)"/>
+              </g>
+              <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+                <text x="51" y="15" fill="#010101" fill-opacity=".3">tracked with</text>
+                <text x="51" y="14">tracked with</text>
+                <text x="139" y="15" fill="#010101" fill-opacity=".3">worklog.today</text>
+                <text x="139" y="14">worklog.today</text>
+              </g>
+            </svg>
+            """;
+        return Content(svg, "image/svg+xml");
+    }
+
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error() =>
         View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });

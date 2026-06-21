@@ -49,6 +49,20 @@ public class AppController : Controller
             .Select(l => l.ToLowerInvariant())
             .Distinct().OrderBy(l => l).ToList();
 
+        // Calculate week streak (consecutive weeks with at least one entry)
+        var allEntryDates = await _db.WorkEntries
+            .Where(w => w.UserId == userId)
+            .Select(w => w.Date)
+            .ToListAsync();
+
+        var weeksWithEntries = allEntryDates.Select(ToMonday).ToHashSet();
+        var thisMonday = ToMonday(DateTime.UtcNow.Date);
+        int streak = 0;
+        var checkMonday = thisMonday;
+        while (weeksWithEntries.Contains(checkMonday)) { streak++; checkMonday = checkMonday.AddDays(-7); }
+        // If this week has no entries yet, count streak from last week so we don't break it
+        if (streak == 0) { checkMonday = thisMonday.AddDays(-7); while (weeksWithEntries.Contains(checkMonday)) { streak++; checkMonday = checkMonday.AddDays(-7); } }
+
         var vm = new AppViewModel
         {
             User = user,
@@ -59,9 +73,16 @@ public class AppController : Controller
             WeekEnd = end,
             WeekOffset = week,
             WeekEntries = entries,
-            NoteCount = notes.Count
+            NoteCount = notes.Count,
+            WeekStreak = streak
         };
         return View(vm);
+    }
+
+    internal static DateTime ToMonday(DateTime d)
+    {
+        int diff = (7 + (int)d.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+        return d.AddDays(-diff).Date;
     }
 
     private static (DateTime start, DateTime end) WeekRange(int offset)

@@ -19,6 +19,7 @@ public class AppViewModel
     public double BillableHours => WeekEntries.Where(e => e.Billable).Sum(e => e.Hours);
     public int EntryCount => WeekEntries.Count;
     public int NoteCount { get; set; }
+    public int WeekStreak { get; set; }
 
     public Dictionary<string, double> HoursByProject =>
         WeekEntries.GroupBy(e => string.IsNullOrWhiteSpace(e.Project) ? "General" : e.Project!)

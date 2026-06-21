@@ -1,0 +1,165 @@
+@model ShareViewModel
+@using WorklogToday.Models.Domain
+@{
+    Layout = null;
+    string Cat(WorkCategory c) => c.ToString();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Model.UserName's week · worklog.today</title>
+    <meta name="description" content="@Model.UserName logged @Model.TotalHours.ToString("0.#")h across @Model.TaskCount tasks — @Model.WeekLabel" />
+    <meta property="og:title" content="@Model.UserName · @Model.WeekLabel" />
+    <meta property="og:description" content="@Model.TotalHours.ToString("0.#")h logged · @Model.TaskCount tasks · @Model.BillableHours.ToString("0.#")h billable" />
+    <meta property="og:type" content="website" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: #f8fafc; color: #1e293b; min-height: 100vh; }
+        a { color: inherit; text-decoration: none; }
+
+        .top-bar { background: #0f172a; color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+        .logo { font-size: 18px; font-weight: 700; color: #f59e0b; letter-spacing: -.3px; }
+        .logo span { color: rgba(255,255,255,.45); }
+        .top-bar-cta { background: #f59e0b; color: #0f172a; font-weight: 600; font-size: 13px; padding: 8px 16px; border-radius: 8px; white-space: nowrap; }
+        .top-bar-cta:hover { background: #fbbf24; }
+
+        .hero { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #fff; padding: 48px 24px 40px; text-align: center; }
+        .avatar { width: 64px; height: 64px; border-radius: 50%; background: #f59e0b; color: #0f172a; font-size: 24px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; }
+        .hero h1 { margin: 0 0 4px; font-size: 26px; }
+        .hero .subtitle { color: rgba(255,255,255,.55); font-size: 14px; margin: 0 0 6px; }
+        .week-label { display: inline-block; background: rgba(245,158,11,.15); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); border-radius: 100px; padding: 5px 14px; font-size: 13px; font-weight: 600; margin-top: 10px; }
+
+        .week-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 20px; }
+        .week-nav a { color: rgba(255,255,255,.6); font-size: 13px; padding: 6px 12px; border: 1px solid rgba(255,255,255,.15); border-radius: 6px; transition: all .15s; }
+        .week-nav a:hover { color: #fff; border-color: rgba(255,255,255,.4); }
+        .week-nav a.disabled { opacity: .3; pointer-events: none; }
+
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; background: #fff; border-bottom: 1px solid #e2e8f0; }
+        .stat { padding: 24px 16px; text-align: center; border-right: 1px solid #e2e8f0; }
+        .stat:last-child { border-right: none; }
+        .stat .v { font-size: 36px; font-weight: 800; color: #0f172a; line-height: 1; }
+        .stat .l { font-size: 12px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
+
+        .content { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+
+        .card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; }
+        .card-head { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .card-head i { color: #f59e0b; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8fafc; padding: 10px 16px; text-align: left; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #e2e8f0; }
+        td { padding: 13px 16px; font-size: 13.5px; border-bottom: 1px solid #f8fafc; }
+        tr:last-child td { border-bottom: none; }
+        .pill { display: inline-block; padding: 2px 8px; border-radius: 100px; font-size: 11px; font-weight: 600; }
+        .cat-dev { background: #dbeafe; color: #1e40af; }
+        .cat-meeting { background: #fef3c7; color: #92400e; }
+        .cat-support { background: #dcfce7; color: #166534; }
+        .cat-review { background: #ede9fe; color: #5b21b6; }
+        .cat-planning { background: #fce7f3; color: #9d174d; }
+        .cat-research { background: #ecfeff; color: #0e7490; }
+        .cat-documentation { background: #f0fdf4; color: #14532d; }
+        .cat-other { background: #f1f5f9; color: #475569; }
+
+        .empty { padding: 48px 24px; text-align: center; color: #94a3b8; }
+        .empty p { margin: 8px 0 0; font-size: 14px; }
+
+        .cta-card { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); color: #fff; border-radius: 16px; padding: 32px; text-align: center; }
+        .cta-card h2 { margin: 0 0 8px; font-size: 20px; }
+        .cta-card p { margin: 0 0 20px; color: rgba(255,255,255,.65); font-size: 14px; }
+        .cta-btn { display: inline-block; background: #f59e0b; color: #0f172a; font-weight: 700; font-size: 15px; padding: 12px 28px; border-radius: 10px; }
+        .cta-btn:hover { background: #fbbf24; }
+
+        @@media (max-width: 480px) {
+            .hero h1 { font-size: 20px; }
+            .stat .v { font-size: 26px; }
+            th.hide-sm { display: none; }
+            td.hide-sm { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <a class="logo" href="/">worklog<span>.today</span></a>
+    <a class="top-bar-cta" href="/Account/Register">Track your own week →</a>
+</div>
+
+<div class="hero">
+    <div class="avatar">@(string.IsNullOrWhiteSpace(Model.UserName) ? "?" : string.Concat(Model.UserName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => p[0])).ToUpper())</div>
+    <h1>@Model.UserName</h1>
+    @if (!string.IsNullOrWhiteSpace(Model.JobTitle) || !string.IsNullOrWhiteSpace(Model.Company))
+    {
+        <p class="subtitle">@Model.JobTitle@(!string.IsNullOrWhiteSpace(Model.JobTitle) && !string.IsNullOrWhiteSpace(Model.Company) ? " · " : "")@Model.Company</p>
+    }
+    <div class="week-label">@Model.WeekLabel</div>
+
+    <div class="week-nav">
+        <a href="/share/@Model.ShareUserId?week=@(Model.WeekOffset - 1)">← Previous week</a>
+        @if (Model.WeekOffset < 0)
+        {
+            <a href="/share/@Model.ShareUserId?week=@(Model.WeekOffset + 1)">Next week →</a>
+        }
+        else
+        {
+            <a class="disabled">Next week →</a>
+        }
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat"><div class="v">@Model.TotalHours.ToString("0.#")h</div><div class="l">Total hours</div></div>
+    <div class="stat"><div class="v">@Model.TaskCount</div><div class="l">Tasks logged</div></div>
+    <div class="stat"><div class="v">@Model.BillableHours.ToString("0.#")h</div><div class="l">Billable hours</div></div>
+</div>
+
+<div class="content">
+    <div class="card">
+        <div class="card-head">
+            <i>📋</i> Work log
+        </div>
+        @if (!Model.Entries.Any())
+        {
+            <div class="empty">
+                <p>No tasks logged for this week.</p>
+            </div>
+        }
+        else
+        {
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Task</th>
+                        <th class="hide-sm">Category</th>
+                        <th>Hours</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in Model.Entries)
+                    {
+                        var catClass = "cat-" + e.Category.ToString().ToLower();
+                        <tr>
+                            <td style="white-space:nowrap;color:#64748b;font-size:13px">@e.Date.ToString("ddd dd")</td>
+                            <td><strong>@e.Task</strong>@(string.IsNullOrWhiteSpace(e.Project) ? "" : $" · {e.Project}")</td>
+                            <td class="hide-sm"><span class="pill @catClass">@Cat(e.Category)</span></td>
+                            <td><strong>@e.Hours.ToString("0.#")h</strong></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="cta-card">
+        <h2>Track your own work week</h2>
+        <p>Log tasks, get AI-generated standups, weekly summaries, and share your progress — free.</p>
+        <a class="cta-btn" href="/Account/Register">Start for free →</a>
+    </div>
+</div>
+
+</body>
+</html>

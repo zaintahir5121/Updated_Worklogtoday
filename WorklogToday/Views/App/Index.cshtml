@@ -52,7 +52,7 @@
     <span class="tab-dot" data-tab="reports"></span>
 </div>
 
-<div class="app-body" data-from="@Model.WeekStart.ToString("yyyy-MM-dd")" data-to="@Model.WeekEnd.ToString("yyyy-MM-dd")" data-today="@DateTime.UtcNow.ToString("yyyy-MM-dd")">
+<div class="app-body" data-from="@Model.WeekStart.ToString("yyyy-MM-dd")" data-to="@Model.WeekEnd.ToString("yyyy-MM-dd")" data-today="@DateTime.UtcNow.ToString("yyyy-MM-dd")" data-user-id="@Model.User.Id" data-week-offset="@Model.WeekOffset">
 
     <!-- NOTES -->
     <section class="tab-pane active" id="pane-notes">
@@ -157,10 +157,20 @@
                 <div class="stat"><div class="v">@Model.NoteCount</div><div class="l">Active notes</div></div>
             }
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:12px">
-            <button class="btn btn-ghost btn-sm" id="shareCardBtn" type="button" title="Generate a shareable image of your week">
-                <i class="bi bi-share"></i> <span class="btn-label">Share my week</span>
-            </button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">
+            @if (Model.WeekStreak > 0)
+            {
+                <div style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;border-radius:100px;padding:6px 14px;font-size:13px;font-weight:600">
+                    <i class="bi bi-fire"></i> @Model.WeekStreak-week streak@(Model.WeekStreak == 1 ? "" : "s")
+                </div>
+            }
+            else { <div></div> }
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-ghost btn-sm" id="badgeBtn" type="button" title="Get your referral badge"><i class="bi bi-patch-check"></i> <span class="btn-label">Get badge</span></button>
+                <button class="btn btn-ghost btn-sm" id="shareLinkBtn" type="button" title="Copy public share link for this week"><i class="bi bi-link-45deg"></i> <span class="btn-label">Share link</span></button>
+                <button class="btn btn-ghost btn-sm" id="emailManagerBtn" type="button" title="Email this week's report to your manager"><i class="bi bi-envelope-arrow-up"></i> <span class="btn-label">Email manager</span></button>
+                <button class="btn btn-ghost btn-sm" id="shareCardBtn" type="button" title="Generate a shareable PNG card"><i class="bi bi-share"></i> <span class="btn-label">Share card</span></button>
+            </div>
         </div>
 
         <div class="ts-grid" style="display:grid;grid-template-columns:1.4fr 1fr;gap:18px">
@@ -378,6 +388,95 @@
         <div class="mf">
             <button class="btn btn-ghost" type="button" data-close>Cancel</button>
             <button class="btn btn-amber" type="button" id="addExtractedBtn"><i class="bi bi-plus-lg"></i> Add selected tasks</button>
+        </div>
+    </div>
+</div>
+
+<!-- Share link modal -->
+<div class="modal-bg" id="shareLinkModal">
+    <div class="modal" style="max-width:520px">
+        <div class="mh">
+            <span><i class="bi bi-link-45deg" style="color:var(--amber)"></i> Public share link</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Anyone with this link can view your work log for this week — no login required. Great for portfolios and manager updates.</p>
+            <div class="field">
+                <label class="lbl">Your public link</label>
+                <div style="display:flex;gap:8px">
+                    <input id="shareLinkUrl" class="input" readonly style="flex:1;font-size:13px;color:var(--muted)" />
+                    <button class="btn btn-amber btn-sm" id="copyShareLinkBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+                </div>
+            </div>
+            <div style="margin-top:12px;font-size:12px;color:var(--muted)">
+                <i class="bi bi-eye"></i> Viewers can see tasks, hours and categories — private notes are never included.
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <a class="btn btn-ghost btn-sm" id="openShareLinkBtn" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Preview</a>
+        </div>
+    </div>
+</div>
+
+<!-- Email manager modal -->
+<div class="modal-bg" id="emailManagerModal">
+    <div class="modal" style="max-width:520px">
+        <div class="mh">
+            <span><i class="bi bi-envelope-arrow-up" style="color:var(--amber)"></i> Email weekly report to manager</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Sends a formatted HTML report of this week's work log. A "Sent via worklog.today" footer is included.</p>
+            <div class="field">
+                <label class="lbl">Manager's email <span style="color:#ef4444">*</span></label>
+                <input id="emEmail" class="input" type="email" placeholder="manager@company.com" />
+            </div>
+            <div class="field">
+                <label class="lbl">Personal message (optional)</label>
+                <textarea id="emMessage" class="input" rows="3" placeholder="e.g. Here's my weekly update. Happy to discuss further in our 1:1." style="resize:vertical"></textarea>
+            </div>
+            <div class="field">
+                <label class="lbl">Week</label>
+                <input id="emWeekLabel" class="input" readonly style="color:var(--muted)" value="@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM yyyy")" />
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="sendEmailManagerBtn"><i class="bi bi-send"></i> Send report</button>
+        </div>
+    </div>
+</div>
+
+<!-- Badge modal -->
+<div class="modal-bg" id="badgeModal">
+    <div class="modal" style="max-width:520px">
+        <div class="mh">
+            <span><i class="bi bi-patch-check" style="color:var(--amber)"></i> Get your badge</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Add to your GitHub README, email signature, or personal site to show you track your work.</p>
+            <div style="text-align:center;margin:0 0 20px">
+                <img src="/badge.svg" alt="tracked with worklog.today" style="height:24px" />
+            </div>
+            <div class="field">
+                <label class="lbl">HTML (for websites &amp; email signatures)</label>
+                <div style="display:flex;gap:8px">
+                    <input id="badgeHtml" class="input" readonly style="flex:1;font-size:12px;font-family:monospace;color:var(--muted)" />
+                    <button class="btn btn-ghost btn-sm" id="copyBadgeHtmlBtn" type="button"><i class="bi bi-clipboard"></i></button>
+                </div>
+            </div>
+            <div class="field">
+                <label class="lbl">Markdown (for GitHub READMEs)</label>
+                <div style="display:flex;gap:8px">
+                    <input id="badgeMd" class="input" readonly style="flex:1;font-size:12px;font-family:monospace;color:var(--muted)" />
+                    <button class="btn btn-ghost btn-sm" id="copyBadgeMdBtn" type="button"><i class="bi bi-clipboard"></i></button>
+                </div>
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
         </div>
     </div>
 </div>

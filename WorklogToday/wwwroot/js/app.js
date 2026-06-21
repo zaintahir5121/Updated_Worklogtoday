@@ -775,6 +775,82 @@
         } catch (e) { toast('⚠ ' + e.message); }
     });
 
+    // ---------- Share link ----------
+    (function () {
+        const btn = $('#shareLinkBtn');
+        const modal = $('#shareLinkModal');
+        if (!btn || !modal) return;
+
+        btn.addEventListener('click', () => {
+            const userId = body.dataset.userId;
+            const weekOffset = parseInt(body.dataset.weekOffset || '0', 10);
+            const url = `${location.origin}/share/${userId}${weekOffset !== 0 ? '?week=' + weekOffset : ''}`;
+            $('#shareLinkUrl').value = url;
+            $('#openShareLinkBtn').href = url;
+            modal.classList.add('open');
+        });
+
+        $('#copyShareLinkBtn').addEventListener('click', async () => {
+            const url = $('#shareLinkUrl').value;
+            try { await navigator.clipboard.writeText(url); toast('Link copied — share it anywhere!'); }
+            catch { toast('Copy failed — select and copy the link manually.'); }
+        });
+    })();
+
+    // ---------- Email manager ----------
+    (function () {
+        const btn = $('#emailManagerBtn');
+        const modal = $('#emailManagerModal');
+        const sendBtn = $('#sendEmailManagerBtn');
+        if (!btn || !modal || !sendBtn) return;
+
+        btn.addEventListener('click', () => modal.classList.add('open'));
+
+        sendBtn.addEventListener('click', async () => {
+            const email = $('#emEmail').value.trim();
+            if (!email) return toast('Enter your manager\'s email');
+            const orig = sendBtn.innerHTML;
+            sendBtn.disabled = true; sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending…';
+            try {
+                await api('POST', '/api/work/email-manager', {
+                    managerEmail: email,
+                    message: $('#emMessage').value.trim() || null,
+                    from: RANGE.from,
+                    to: RANGE.to
+                });
+                modal.classList.remove('open');
+                toast('Report sent to ' + email + ' ✓');
+            } catch (e) { toast('⚠ ' + e.message); }
+            finally { sendBtn.disabled = false; sendBtn.innerHTML = orig; }
+        });
+    })();
+
+    // ---------- Badge ----------
+    (function () {
+        const btn = $('#badgeBtn');
+        const modal = $('#badgeModal');
+        if (!btn || !modal) return;
+
+        const origin = location.origin;
+        const badgeUrl = `${origin}/badge.svg`;
+        const siteUrl = origin;
+
+        btn.addEventListener('click', () => {
+            $('#badgeHtml').value = `<a href="${siteUrl}" title="I track my work on worklog.today"><img src="${badgeUrl}" alt="tracked with worklog.today" height="20" /></a>`;
+            $('#badgeMd').value = `[![tracked with worklog.today](${badgeUrl})](${siteUrl})`;
+            modal.classList.add('open');
+        });
+
+        $('#copyBadgeHtmlBtn').addEventListener('click', async () => {
+            try { await navigator.clipboard.writeText($('#badgeHtml').value); toast('HTML badge copied!'); }
+            catch { toast('Copy failed.'); }
+        });
+        $('#copyBadgeMdBtn').addEventListener('click', async () => {
+            try { await navigator.clipboard.writeText($('#badgeMd').value); toast('Markdown badge copied!'); }
+            catch { toast('Copy failed.'); }
+        });
+    })();
+
     // ---------- Share card ----------
     (function () {
         const shareBtn = $('#shareCardBtn');
