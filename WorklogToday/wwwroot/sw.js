@@ -1,5 +1,5 @@
 // worklog.today service worker — app-shell cache + offline fallback.
-const CACHE = 'worklog-v4';
+const CACHE = 'worklog-v5';
 const SHELL = [
   '/css/site.css',
   '/js/app.js',

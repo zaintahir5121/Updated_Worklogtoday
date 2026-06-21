@@ -23,8 +23,10 @@ public class UserApiController : ControllerBase
 
         user.EmailDigestEnabled = dto.EmailDigestEnabled;
         if (dto.HourlyRate >= 0) user.HourlyRate = dto.HourlyRate;
-        if (!string.IsNullOrWhiteSpace(dto.JobTitle)) user.JobTitle = dto.JobTitle.Trim();
-        if (!string.IsNullOrWhiteSpace(dto.Company)) user.Company = dto.Company.Trim();
+        // Allow clearing these fields (null/empty means "no value")
+        user.JobTitle = string.IsNullOrWhiteSpace(dto.JobTitle) ? null : dto.JobTitle.Trim();
+        user.Company = string.IsNullOrWhiteSpace(dto.Company) ? null : dto.Company.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.FullName)) user.FullName = dto.FullName.Trim();
 
         await _users.UpdateAsync(user);
         return Ok(new { ok = true });
@@ -40,9 +42,10 @@ public class UserApiController : ControllerBase
             emailDigestEnabled = user.EmailDigestEnabled,
             hourlyRate = user.HourlyRate,
             jobTitle = user.JobTitle ?? "",
-            company = user.Company ?? ""
+            company = user.Company ?? "",
+            fullName = user.FullName ?? ""
         });
     }
 }
 
-public record UserSettingsDto(bool EmailDigestEnabled, decimal HourlyRate, string? JobTitle, string? Company);
+public record UserSettingsDto(bool EmailDigestEnabled, decimal HourlyRate, string? JobTitle, string? Company, string? FullName);

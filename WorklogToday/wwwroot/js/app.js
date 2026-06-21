@@ -152,8 +152,8 @@
     // ---------- Mobile FAB ----------
     const mobileFab = $('#mobileFab');
     if (mobileFab) {
-        mobileFab.addEventListener('click', () => {
-            // Expand the composer and focus it
+        mobileFab.addEventListener('click', e => {
+            e.stopPropagation(); // prevent document handler from immediately collapsing
             const composer = $('#composer');
             const body = $('#cBody');
             if (composer && body) {
@@ -860,7 +860,8 @@
                 emailDigestEnabled: $('#sDigest').checked,
                 hourlyRate: parseFloat($('#sRate').value) || 0,
                 jobTitle: $('#sTitle').value.trim(),
-                company: $('#sCompany').value.trim()
+                company: $('#sCompany').value.trim(),
+                fullName: ($('#sName') ? $('#sName').value.trim() : '')
             });
             settingsModal.classList.remove('open');
             toast('Settings saved!');

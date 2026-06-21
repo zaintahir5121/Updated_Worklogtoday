@@ -358,6 +358,7 @@ table.t tbody tr:hover { background:var(--soft); }
         padding:0 12px;
         height:52px;
         gap:8px;
+        flex-wrap:nowrap;  /* prevent avatar/icons from wrapping below header */
     }
     .app-top .logo { font-size:16px; }
     .app-top .logo .mark { width:28px; height:28px; font-size:14px; }
@@ -376,6 +377,10 @@ table.t tbody tr:hover { background:var(--soft); }
     .hide-mobile { display:none !important; }
     .btn-label { display:none; }
     .tab-label { display:none; }
+    /* Compact app-user on mobile — hide logout, shrink icons */
+    .app-user form { display:none; }
+    .app-user .icon-btn { width:32px; height:32px; font-size:16px; }
+    .app-user .avatar { width:32px; height:32px; font-size:13px; cursor:pointer; }
 
     /* App body — full bleed, sliding tabs container */
     .app-body {
@@ -443,6 +448,10 @@ table.t tbody tr:hover { background:var(--soft); }
     }
     .composer.expanded { border-radius:14px; }
     .composer .cbody { font-size:16px; }
+    /* Composer toolbar wraps on mobile so nothing overflows */
+    .composer .ctools { flex-wrap:wrap; gap:8px; }
+    .swatches { flex-wrap:wrap; gap:5px; }
+    .composer .ctools .nlabels-input { min-width:60px; }
     /* Prevent iOS auto-zoom on focus — all inputs must be >= 16px */
     input, textarea, select { font-size:16px !important; }
     .nlabels-input { font-size:16px !important; }
@@ -601,15 +610,17 @@ tr.task-editing td,
 tr.task-editing .task-editing-cell { padding: 10px 14px !important; background: #fffdf7; border-bottom: 2px solid var(--amber) !important; }
 
 /* ── Note backdrop (Google Keep open card feel) ── */
+/* pointer-events:none so it never blocks clicks on note cards or actions.
+   Click-outside-to-close is handled by the document click handler in app.js */
 .note-backdrop {
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,.3);
+    background: rgba(0,0,0,.35);
     z-index: 9;
+    pointer-events: none;
 }
 .note-backdrop.on { display: block; }
-.note.note-open { position: relative; z-index: 10; }
 
 /* ── Composer placeholder behavior (Keep-style) ── */
 .composer .ctitle { display: none; }

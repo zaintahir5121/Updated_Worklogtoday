@@ -88,7 +88,31 @@ app.MapControllerRoute(
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    db.Database.Migrate();
+    // SQLite (dev/test) doesn't support SQL Server migration DDL — use EnsureCreated instead
+    if (db.Database.IsSqlite())
+        db.Database.EnsureCreated();
+    else
+        db.Database.Migrate();
+}
+
+// Dev-only: auto-login endpoint for testing without Google OAuth
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/dev/login", async (
+        UserManager<ApplicationUser> userMgr,
+        SignInManager<ApplicationUser> signInMgr,
+        HttpContext ctx) =>
+    {
+        const string email = "dev@worklog.test";
+        var user = await userMgr.FindByEmailAsync(email);
+        if (user == null)
+        {
+            user = new ApplicationUser { UserName = email, Email = email, FullName = "Dev Tester", EmailConfirmed = true };
+            await userMgr.CreateAsync(user, "DevPass123!");
+        }
+        await signInMgr.SignInAsync(user, isPersistent: false);
+        ctx.Response.Redirect("/app");
+    });
 }
 
 app.Run();
