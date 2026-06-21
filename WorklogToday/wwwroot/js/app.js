@@ -775,6 +775,188 @@
         } catch (e) { toast('⚠ ' + e.message); }
     });
 
+    // ---------- Share card ----------
+    (function () {
+        const shareBtn = $('#shareCardBtn');
+        const shareModal = $('#shareCardModal');
+        const canvas = $('#shareCanvas');
+        if (!shareBtn || !shareModal || !canvas) return;
+
+        function buildCard() {
+            const sg = $('.stat-grid');
+            const totalHours  = sg ? sg.dataset.totalHours    : '0';
+            const billable    = sg ? sg.dataset.billableHours  : '0';
+            const taskCount   = sg ? sg.dataset.taskCount      : '0';
+            const earnings    = sg ? sg.dataset.earnings        : '';
+            const weekLabel   = sg ? sg.dataset.weekLabel       : '';
+            const userName    = ($('.user-name-wrap div') || {}).textContent?.trim() || '';
+            const jobTitle    = ($$('.user-name-wrap div')[1] || {}).textContent?.trim() || '';
+
+            const W = 1200, H = 628;
+            canvas.width  = W;
+            canvas.height = H;
+            const ctx = canvas.getContext('2d');
+
+            // ── Background ──────────────────────────────────────────────────
+            const bg = ctx.createLinearGradient(0, 0, W, H);
+            bg.addColorStop(0, '#0f172a');
+            bg.addColorStop(1, '#1e293b');
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, W, H);
+
+            // Subtle dot grid overlay
+            ctx.fillStyle = 'rgba(255,255,255,0.025)';
+            for (let x = 40; x < W; x += 48) {
+                for (let y = 40; y < H; y += 48) {
+                    ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+
+            // ── Amber top bar ────────────────────────────────────────────────
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(0, 0, W, 8);
+
+            // ── Logo (top-left) ──────────────────────────────────────────────
+            const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+            ctx.font = `bold 28px ${FONT}`;
+            ctx.fillStyle = '#f59e0b';
+            ctx.textBaseline = 'middle';
+            const logoW = ctx.measureText('worklog').width;
+            ctx.fillText('worklog', 60, 66);
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.fillText('.today', 60 + logoW, 66);
+
+            // ── Week label (top-right) ────────────────────────────────────────
+            ctx.font = `18px ${FONT}`;
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.textAlign = 'right';
+            ctx.fillText(weekLabel, W - 60, 66);
+            ctx.textAlign = 'left';
+
+            // ── Column separators ────────────────────────────────────────────
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 1;
+            [W / 3, (W / 3) * 2].forEach(x => {
+                ctx.beginPath(); ctx.moveTo(x, 130); ctx.lineTo(x, 370); ctx.stroke();
+            });
+
+            // ── Stats (3 columns) ────────────────────────────────────────────
+            const stats = [
+                { value: totalHours + 'h', label: 'Total hours' },
+                { value: taskCount,        label: 'Tasks logged' },
+                { value: billable + 'h',   label: 'Billable hours', sub: earnings || null }
+            ];
+            const colW = W / 3;
+            ctx.textAlign = 'center';
+            stats.forEach((s, i) => {
+                const cx = colW * i + colW / 2;
+
+                // Big value
+                ctx.font = `bold 86px ${FONT}`;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(s.value, cx, 258);
+
+                // Label
+                ctx.font = `21px ${FONT}`;
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fillText(s.label, cx, 316);
+
+                // Sub-label (earnings)
+                if (s.sub) {
+                    ctx.font = `bold 20px ${FONT}`;
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.fillText(s.sub + ' earned', cx, 348);
+                }
+            });
+            ctx.textAlign = 'left';
+
+            // ── Divider ───────────────────────────────────────────────────────
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(60, 402); ctx.lineTo(W - 60, 402); ctx.stroke();
+
+            // ── User info (bottom-left) ──────────────────────────────────────
+            ctx.font = `bold 22px ${FONT}`;
+            ctx.fillStyle = '#ffffff';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillText(userName, 60, 490);
+            if (jobTitle) {
+                ctx.font = `18px ${FONT}`;
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fillText(jobTitle, 60, 522);
+            }
+
+            // ── CTA tag (bottom-left, lower) ─────────────────────────────────
+            const tagY = 582;
+            ctx.font = `15px ${FONT}`;
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            ctx.fillText('Track your work week at', 60, tagY);
+
+            // ── URL (bottom-right) ───────────────────────────────────────────
+            ctx.font = `bold 24px ${FONT}`;
+            ctx.fillStyle = '#f59e0b';
+            ctx.textAlign = 'right';
+            ctx.fillText('worklog.today', W - 60, tagY);
+            ctx.textAlign = 'left';
+
+            // ── Amber bottom accent ──────────────────────────────────────────
+            const grad2 = ctx.createLinearGradient(0, H - 4, W, H - 4);
+            grad2.addColorStop(0, '#f59e0b');
+            grad2.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad2;
+            ctx.fillRect(0, H - 4, W, 4);
+
+            return canvas;
+        }
+
+        function cardText() {
+            const sg = $('.stat-grid');
+            const totalHours = sg?.dataset.totalHours || '0';
+            const taskCount  = sg?.dataset.taskCount  || '0';
+            const billable   = sg?.dataset.billableHours || '0';
+            const weekLabel  = sg?.dataset.weekLabel || '';
+            const userName   = ($('.user-name-wrap div') || {}).textContent?.trim() || '';
+            const earnings   = sg?.dataset.earnings || '';
+            const earningsLine = earnings ? `\n💰 ${earnings} estimated earnings` : '';
+            return `📊 My week on worklog.today (${weekLabel})\n\n⏱ ${totalHours}h logged  ✅ ${taskCount} tasks  💼 ${billable}h billable${earningsLine}\n\nTrack your work week: https://worklog.today`;
+        }
+
+        shareBtn.addEventListener('click', () => {
+            buildCard();
+            shareModal.classList.add('open');
+        });
+
+        $('#downloadCardBtn').addEventListener('click', () => {
+            const sg = $('.stat-grid');
+            const weekLabel = (sg?.dataset.weekLabel || 'week').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+            const link = document.createElement('a');
+            link.download = `worklog-${weekLabel}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            toast('Card downloaded!');
+        });
+
+        $('#copyCardImgBtn').addEventListener('click', async () => {
+            try {
+                canvas.toBlob(async blob => {
+                    try {
+                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                        toast('Image copied to clipboard — paste into LinkedIn or Twitter!');
+                    } catch {
+                        toast('Copy not supported in this browser — use Download instead.');
+                    }
+                }, 'image/png');
+            } catch { toast('Use Download PNG instead.'); }
+        });
+
+        $('#copyCardTextBtn').addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(cardText());
+                toast('Caption copied — paste it with your image!');
+            } catch { toast('Could not copy text.'); }
+        });
+    })();
+
     // ---------- Modals close ----------
     $$('[data-close]').forEach(b => b.addEventListener('click', () => b.closest('.modal-bg').classList.remove('open')));
     $$('.modal-bg').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));

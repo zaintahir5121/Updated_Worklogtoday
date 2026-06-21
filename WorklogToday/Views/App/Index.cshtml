@@ -136,7 +136,12 @@
 
     <!-- TIMESHEET -->
     <section class="tab-pane" id="pane-timesheet">
-        <div class="stat-grid">
+        <div class="stat-grid"
+             data-total-hours="@Model.TotalHours.ToString("0.#")"
+             data-billable-hours="@Model.BillableHours.ToString("0.#")"
+             data-task-count="@Model.EntryCount"
+             data-earnings="@(Model.User.HourlyRate > 0 ? "$" + (Model.BillableHours * (double)Model.User.HourlyRate).ToString("N0") : "")"
+             data-week-label="@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM yyyy")">
             <div class="stat"><div class="v">@Model.TotalHours.ToString("0.#")</div><div class="l">Total hours</div></div>
             <div class="stat"><div class="v">@Model.BillableHours.ToString("0.#")</div><div class="l">Billable hours</div></div>
             <div class="stat"><div class="v">@Model.EntryCount</div><div class="l">Tasks logged</div></div>
@@ -151,6 +156,11 @@
             {
                 <div class="stat"><div class="v">@Model.NoteCount</div><div class="l">Active notes</div></div>
             }
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px">
+            <button class="btn btn-ghost btn-sm" id="shareCardBtn" type="button" title="Generate a shareable image of your week">
+                <i class="bi bi-share"></i> <span class="btn-label">Share my week</span>
+            </button>
         </div>
 
         <div class="ts-grid" style="display:grid;grid-template-columns:1.4fr 1fr;gap:18px">
@@ -368,6 +378,28 @@
         <div class="mf">
             <button class="btn btn-ghost" type="button" data-close>Cancel</button>
             <button class="btn btn-amber" type="button" id="addExtractedBtn"><i class="bi bi-plus-lg"></i> Add selected tasks</button>
+        </div>
+    </div>
+</div>
+
+<!-- Share card modal -->
+<div class="modal-bg" id="shareCardModal">
+    <div class="modal" style="max-width:660px">
+        <div class="mh">
+            <span><i class="bi bi-share" style="color:var(--amber)"></i> Share my week</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb" style="padding:16px 24px">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Share to LinkedIn, Twitter, or anywhere — download the PNG or copy it to clipboard.</p>
+            <div id="shareCardPreview" style="width:100%;border-radius:10px;overflow:hidden;background:#0f172a;line-height:0">
+                <canvas id="shareCanvas" style="width:100%;height:auto;display:block"></canvas>
+            </div>
+        </div>
+        <div class="mf" style="flex-wrap:wrap;gap:8px">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-ghost btn-sm" id="copyCardTextBtn" type="button"><i class="bi bi-clipboard-fill"></i> Copy text</button>
+            <button class="btn btn-ghost btn-sm" id="copyCardImgBtn" type="button"><i class="bi bi-image"></i> Copy image</button>
+            <button class="btn btn-amber btn-sm" id="downloadCardBtn" type="button"><i class="bi bi-download"></i> Download PNG</button>
         </div>
     </div>
 </div>
