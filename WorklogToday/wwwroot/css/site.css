@@ -133,16 +133,115 @@ a { color: inherit; }
 /* notes grid (masonry) */
 .notes-section-label { font-size:11px; letter-spacing:1.4px; text-transform:uppercase; color:var(--muted); font-weight:700; margin:6px 4px 12px; }
 .masonry { columns: 4 240px; column-gap:16px; }
-.note { break-inside:avoid; margin-bottom:16px; border-radius:14px; padding:15px; border:1px solid rgba(0,0,0,.08); position:relative; cursor:default; transition:.15s; box-shadow: var(--shadow-sm); }
-.note:hover { box-shadow: var(--shadow-md); }
-.note h4 { margin:0 0 6px; font-size:15.5px; line-height:1.3; }
-.note .ntext { font-size:14px; color:#3c4043; white-space:pre-wrap; line-height:1.5; word-break:break-word; }
-.note .nlabels { margin-top:10px; display:flex; flex-wrap:wrap; gap:5px; }
-.note .nlabel { font-size:11px; background:rgba(0,0,0,.07); padding:3px 9px; border-radius:999px; }
-.note .nactions { display:flex; gap:2px; margin-top:10px; opacity:0; transition:.15s; }
-.note:hover .nactions { opacity:1; }
-.note .pin { position:absolute; top:8px; right:8px; opacity:0; }
-.note:hover .pin, .note.pinned .pin { opacity:1; }
+.note {
+    break-inside: avoid;
+    margin-bottom: 16px;
+    border-radius: 14px;
+    padding: 15px;
+    border: 1px solid rgba(0,0,0,.08);
+    position: relative;
+    cursor: pointer;
+    transition: box-shadow .15s, border-color .15s;
+    box-shadow: var(--shadow-sm);
+}
+.note:hover { box-shadow: var(--shadow-md); border-color: rgba(0,0,0,.15); }
+.note.note-open {
+    cursor: default;
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(0,0,0,.18);
+    z-index: 10;
+    break-inside: avoid;
+}
+
+/* Contenteditable title & body */
+.note .ntitle-edit {
+    font-size: 15.5px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    outline: none;
+    word-break: break-word;
+    min-height: 0;
+    cursor: text;
+}
+.note .ntitle-edit:empty::before {
+    content: attr(data-placeholder);
+    color: var(--muted);
+    pointer-events: none;
+    display: none;
+}
+.note.note-open .ntitle-edit:empty::before { display: block; }
+
+.note .ntext-edit {
+    font-size: 14px;
+    color: #3c4043;
+    white-space: pre-wrap;
+    line-height: 1.6;
+    word-break: break-word;
+    outline: none;
+    min-height: 20px;
+    cursor: text;
+}
+.note .ntext-edit:empty::before {
+    content: attr(data-placeholder);
+    color: var(--muted);
+    pointer-events: none;
+    display: none;
+}
+.note.note-open .ntext-edit:empty::before { display: block; }
+
+/* Labels chips */
+.note .nlabels { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; min-height: 0; }
+.note .nlabel { font-size: 11px; background: rgba(0,0,0,.07); padding: 3px 9px; border-radius: 999px; }
+
+/* Expanded tools (swatches + label input) — hidden until card is open */
+.note-expanded-tools {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0,0,0,.08);
+    flex-wrap: wrap;
+}
+.note.note-open .note-expanded-tools { display: flex; }
+
+.note-swatches { display: flex; gap: 5px; }
+.nsw {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid rgba(0,0,0,.12);
+    cursor: pointer;
+    transition: transform .12s;
+}
+.nsw:hover { transform: scale(1.2); }
+.nsw.active { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.nlabels-input {
+    flex: 1; min-width: 80px;
+    border: none; background: transparent;
+    outline: none; font-size: 12px;
+    color: var(--muted); font-family: inherit;
+    padding: 2px 0;
+}
+
+/* Actions row */
+.note .nactions {
+    display: flex;
+    gap: 2px;
+    margin-top: 10px;
+    opacity: 0;
+    transition: opacity .15s;
+}
+.note:hover .nactions,
+.note.note-open .nactions { opacity: 1; }
+
+/* Close button only visible when card is open */
+.note .note-close-btn { display: none; margin-left: auto; }
+.note.note-open .note-close-btn { display: grid; }
+
+/* Pin button */
+.note .pin { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity .15s; }
+.note:hover .pin, .note.pinned .pin, .note.note-open .pin { opacity: 1; }
 .note .pin.on { color: var(--amber-2); }
 .mini-btn { width:30px;height:30px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:grid;place-items:center;color:#5f6368;font-size:15px; }
 .mini-btn:hover { background:rgba(0,0,0,.08); color:var(--ink); }
@@ -285,9 +384,10 @@ table.t tbody tr:hover { background:var(--soft); }
     .note .ntext { font-size:12.5px; line-height:1.4; }
     .note .nlabels { margin-top:8px; gap:4px; }
     .note .nlabel { font-size:10px; padding:2px 7px; }
-    /* Always show note actions on mobile (no hover) */
-    .note .nactions { opacity:1; margin-top:8px; }
-    .note .pin { opacity:1; }
+    /* On mobile show actions only when card is open (tap to open) */
+    .note .nactions { margin-top:8px; }
+    .note.note-open .nactions { opacity:1; }
+    .note.note-open .pin { opacity:1; }
     .mini-btn { width:26px; height:26px; font-size:13px; }
 
     /* Composer — collapsed by default, full width */

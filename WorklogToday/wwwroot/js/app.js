@@ -115,19 +115,28 @@
         } catch (e) { toast(e.message); }
     });
 
+    const COLORS = ["#ffffff","#fff8c5","#d3f9d8","#dbeafe","#fbe4ff","#ffe8cc","#ffd6d6"];
+
     function noteCardHtml(n) {
         const labels = (n.labels || '').split(',').map(s => s.trim()).filter(Boolean);
+        const swatches = COLORS.map(c =>
+            `<span class="nsw${c === n.colorHex ? ' active' : ''}" style="background:${c}" data-color="${c}"></span>`
+        ).join('');
         return `
-          <button class="mini-btn pin ${n.isPinned ? 'on' : ''}" type="button" data-act="pin" title="Pin"><i class="bi ${n.isPinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}"></i></button>
-          ${n.title ? `<h4 class="ntitle">${esc(n.title)}</h4>` : ''}
-          <div class="ntext">${esc(n.content)}</div>
-          ${labels.length ? `<div class="nlabels">${labels.map(l => `<span class="nlabel">${esc(l)}</span>`).join('')}</div>` : ''}
+          <button class="mini-btn pin ${n.isPinned ? 'on' : ''}" type="button" data-act="pin" title="Pin note"><i class="bi ${n.isPinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}"></i></button>
+          <div class="ntitle-edit" contenteditable="true" data-placeholder="Title" spellcheck="true">${esc(n.title || '')}</div>
+          <div class="ntext-edit" contenteditable="true" data-placeholder="Add a note…" spellcheck="true">${esc(n.content || '')}</div>
+          <div class="nlabels">${labels.map(l => `<span class="nlabel">${esc(l)}</span>`).join('')}</div>
+          <div class="note-expanded-tools">
+            <div class="note-swatches">${swatches}</div>
+            <input class="nlabels-input" value="${esc(n.labels || '')}" placeholder="labels…" title="Comma-separated labels" />
+          </div>
           <div class="nactions">
-            <button class="mini-btn" type="button" data-act="popout" title="Pop out as desktop sticky"><i class="bi bi-window-stack"></i></button>
-            <button class="mini-btn" type="button" data-act="edit" title="Edit"><i class="bi bi-pencil"></i></button>
+            <button class="mini-btn" type="button" data-act="popout" title="Pop out sticky"><i class="bi bi-window-stack"></i></button>
             <button class="mini-btn" type="button" data-act="extract" title="Extract tasks with Smart AI"><i class="bi bi-list-task"></i></button>
             <button class="mini-btn" type="button" data-act="archive" title="Archive"><i class="bi bi-archive"></i></button>
             <button class="mini-btn" type="button" data-act="delete" title="Delete"><i class="bi bi-trash"></i></button>
+            <button class="mini-btn note-close-btn" type="button" data-act="close" title="Close"><i class="bi bi-x-lg"></i></button>
           </div>`;
     }
     function makeNoteEl(n) {
@@ -152,12 +161,90 @@
         $('#notesEmpty').style.display = (hasPinned || hasOther) ? 'none' : '';
     }
 
-    // Note actions (event delegation)
+    // ── Inline note editing (Google Keep-style) ──────────────────────────────
+    let activeCard = null;
+    let autoSaveTimer = null;
+
+    function openNoteInline(card) {
+        if (activeCard === card) return;
+        if (activeCard) closeNoteInline(activeCard);
+        activeCard = card;
+        card.classList.add('note-open');
+        card.querySelector('.ntitle-edit').focus();
+    }
+
+    async function closeNoteInline(card) {
+        if (!card || !card.classList.contains('note-open')) return;
+        card.classList.remove('note-open');
+        if (activeCard === card) activeCard = null;
+        clearTimeout(autoSaveTimer);
+        await saveNoteInline(card);
+    }
+
+    async function saveNoteInline(card, silent = false) {
+        const id = card.dataset.id;
+        const title = card.querySelector('.ntitle-edit').textContent.trim();
+        const content = card.querySelector('.ntext-edit').textContent.trim();
+        const colorHex = card.dataset.color;
+        const labels = card.querySelector('.nlabels-input').value.trim();
+
+        // Update label chips inline
+        const chipsEl = card.querySelector('.nlabels');
+        if (chipsEl) {
+            const chips = labels.split(',').map(s => s.trim()).filter(Boolean);
+            chipsEl.innerHTML = chips.map(l => `<span class="nlabel">${esc(l)}</span>`).join('');
+        }
+        card.dataset.labels = labels;
+
+        try {
+            await api('PUT', `/api/notes/${id}`, { title, content, colorHex, labels });
+            if (!silent) toast('Saved ✓', 1200);
+        } catch (e) { toast('⚠ ' + e.message); }
+    }
+
+    function scheduleAutoSave(card) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(() => saveNoteInline(card, true), 1500);
+    }
+
+    // Click on card body → open inline edit
+    document.addEventListener('click', e => {
+        const card = e.target.closest('.note');
+        if (!card) { if (activeCard) closeNoteInline(activeCard); return; }
+
+        // Don't intercept action buttons
+        const btn = e.target.closest('[data-act]');
+        if (btn) return;
+
+        openNoteInline(card);
+    });
+
+    // Auto-save on typing inside an open card
+    document.addEventListener('input', e => {
+        const card = e.target.closest('.note.note-open');
+        if (card) scheduleAutoSave(card);
+    });
+
+    // Color swatch click inside card
+    document.addEventListener('click', async e => {
+        const swatch = e.target.closest('.note .nsw');
+        if (!swatch) return;
+        const card = swatch.closest('.note');
+        const color = swatch.dataset.color;
+        card.style.background = color;
+        card.dataset.color = color;
+        card.querySelectorAll('.nsw').forEach(s => s.classList.toggle('active', s.dataset.color === color));
+        scheduleAutoSave(card);
+    });
+
+    // Note action buttons (event delegation)
     document.addEventListener('click', async e => {
         const btn = e.target.closest('.note [data-act]'); if (!btn) return;
         const card = btn.closest('.note'); const id = card.dataset.id; const act = btn.dataset.act;
         try {
-            if (act === 'pin') {
+            if (act === 'close') {
+                await closeNoteInline(card);
+            } else if (act === 'pin') {
                 const n = await api('POST', `/api/notes/${id}/pin`);
                 card.remove(); addNoteToDom(n, true);
                 toast(n.isPinned ? 'Pinned' : 'Unpinned');
@@ -170,32 +257,15 @@
                 card.remove(); refreshSections(); toast('Deleted');
             } else if (act === 'popout') {
                 openSticky(id);
-            } else if (act === 'edit') {
-                openNoteModal(card);
             } else if (act === 'extract') {
                 openExtractModal(id, btn);
             }
         } catch (err) { toast(err.message); }
     });
 
-    // Note edit modal
-    const noteModal = $('#noteModal');
-    function openNoteModal(card) {
-        $('#nId').value = card.dataset.id;
-        $('#nTitle').value = card.querySelector('.ntitle')?.textContent || '';
-        $('#nBody').value = card.querySelector('.ntext')?.textContent || '';
-        $('#nLabels').value = card.dataset.labels || '';
-        noteModal.classList.add('open');
-    }
-    $('#saveNoteEditBtn').addEventListener('click', async () => {
-        const id = $('#nId').value;
-        const card = $(`.note[data-id="${id}"]`);
-        try {
-            const n = await api('PUT', `/api/notes/${id}`, { title: $('#nTitle').value, content: $('#nBody').value, colorHex: card.dataset.color, labels: $('#nLabels').value });
-            const fresh = makeNoteEl({ ...n });
-            card.replaceWith(fresh);
-            noteModal.classList.remove('open'); toast('Saved');
-        } catch (e) { toast(e.message); }
+    // Escape key closes active card
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && activeCard) closeNoteInline(activeCard);
     });
 
     // ---------- Smart AI: Extract tasks from note ----------
