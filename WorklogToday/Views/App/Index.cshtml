@@ -193,8 +193,9 @@
             <div class="card">
                 <div class="hd"><strong>By project</strong></div>
                 <div class="bd" style="padding:16px">
-                    @if (!Model.HoursByProject.Any()) { <div class="empty" style="padding:28px"><p>No data yet.</p></div> }
-                    @foreach (var kv in Model.HoursByProject.OrderByDescending(k => k.Value))
+                    @{ var hbp = Model.HoursByProject ?? new Dictionary<string, double>(); }
+                    @if (!hbp.Any()) { <div class="empty" style="padding:28px"><p>No data yet.</p></div> }
+                    @foreach (var kv in hbp.OrderByDescending(k => k.Value))
                     {
                         var w = maxProj > 0 ? (int)(kv.Value / maxProj * 100) : 0;
                         <div style="margin-bottom:13px">
