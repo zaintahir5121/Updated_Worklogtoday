@@ -266,6 +266,12 @@
         $('#notesEmpty').style.display = (hasPinned || hasOther) ? 'none' : '';
     }
 
+    // ── Note backdrop (Google Keep style) ──────────────────────────────────
+    const noteBackdrop = document.createElement('div');
+    noteBackdrop.className = 'note-backdrop';
+    document.body.appendChild(noteBackdrop);
+    noteBackdrop.addEventListener('click', () => { if (activeCard) closeNoteInline(activeCard); });
+
     // ── Inline note editing (Google Keep-style) ──────────────────────────────
     let activeCard = null;
     let autoSaveTimer = null;
@@ -275,12 +281,14 @@
         if (activeCard) closeNoteInline(activeCard);
         activeCard = card;
         card.classList.add('note-open');
-        card.querySelector('.ntitle-edit').focus();
+        noteBackdrop.classList.add('on');
+        card.querySelector('.ntext-edit').focus();
     }
 
     async function closeNoteInline(card) {
         if (!card || !card.classList.contains('note-open')) return;
         card.classList.remove('note-open');
+        noteBackdrop.classList.remove('on');
         if (activeCard === card) activeCard = null;
         clearTimeout(autoSaveTimer);
         await saveNoteInline(card);
@@ -472,14 +480,99 @@
         taskModal.classList.add('open');
     }
     $('#addTaskBtn').addEventListener('click', () => openTaskModal(null));
+
+    // ── Inline row editor ─────────────────────────────────────────────────────
+    function catOptions(sel) {
+        return CAT.map((c, i) => `<option value="${i}"${sel == i ? ' selected' : ''}>${c}</option>`).join('');
+    }
+    function statOptions(sel) {
+        return STAT.map((s, i) => `<option value="${i}"${sel == i ? ' selected' : ''}>${s}</option>`).join('');
+    }
+    function rowEditHtml(w) {
+        return `<td colspan="7" class="task-editing-cell">
+          <div class="task-inline-edit">
+            <input class="input ie-task" value="${esc(w.task || '')}" placeholder="What did you work on?" />
+            <div class="ie-row">
+              <input class="input ie-project" value="${esc(w.project || '')}" placeholder="Project (optional)" />
+              <input class="input ie-date" type="date" value="${(w.date || RANGE.today).slice(0, 10)}" />
+              <select class="input ie-cat">${catOptions(w.category)}</select>
+              <select class="input ie-status">${statOptions(w.status)}</select>
+              <input class="input ie-hours" type="number" value="${w.hours || 1}" min="0.25" step="0.25" />
+              <label class="ie-bill"><input type="checkbox" class="ie-billable"${w.billable ? ' checked' : ''} /> Billable</label>
+            </div>
+            <div class="ie-actions">
+              <button class="btn btn-ghost btn-sm ie-cancel" type="button">Cancel</button>
+              <button class="btn btn-amber btn-sm ie-save" type="button"><i class="bi bi-check-lg"></i> Save</button>
+            </div>
+          </div>
+        </td>`;
+    }
+
+    function openInlineEdit(row) {
+        // close any other open inline editor
+        $$('#taskBody tr.task-editing').forEach(r => { if (r !== row) cancelInlineEdit(r); });
+        if (row.classList.contains('task-editing')) return;
+        row.classList.add('task-editing');
+        const w = {
+            task: row.dataset.task, project: row.dataset.project,
+            date: row.dataset.date, category: +row.dataset.category,
+            status: +row.dataset.status, hours: +row.dataset.hours,
+            billable: row.dataset.billable === 'true'
+        };
+        row._savedCells = row.innerHTML;
+        row.innerHTML = rowEditHtml(w);
+        row.querySelector('.ie-task').focus();
+    }
+
+    function cancelInlineEdit(row) {
+        if (!row.classList.contains('task-editing')) return;
+        row.classList.remove('task-editing');
+        row.innerHTML = row._savedCells;
+    }
+
+    async function saveInlineEdit(row) {
+        if (!row.classList.contains('task-editing')) return;
+        const task = row.querySelector('.ie-task').value.trim();
+        if (!task) return toast('Task description is required');
+        const payload = {
+            task,
+            project: row.querySelector('.ie-project').value.trim(),
+            date: row.querySelector('.ie-date').value,
+            category: +row.querySelector('.ie-cat').value,
+            status: +row.querySelector('.ie-status').value,
+            hours: +row.querySelector('.ie-hours').value || 1,
+            billable: row.querySelector('.ie-billable').checked,
+            notes: null
+        };
+        try {
+            const w = await api('PUT', `/api/work/${row.dataset.id}`, payload);
+            row.classList.remove('task-editing');
+            if (inRange(w.date)) { setRowData(row, w); }
+            else { row.remove(); }
+            taskEmptyCheck(); toast('Task saved');
+        } catch (err) { toast(err.message); }
+    }
+
     $('#taskBody').addEventListener('click', async e => {
         const row = e.target.closest('tr'); if (!row) return;
-        if (e.target.closest('.editTask')) openTaskModal(row);
+
+        if (e.target.closest('.ie-save')) { saveInlineEdit(row); return; }
+        if (e.target.closest('.ie-cancel')) { cancelInlineEdit(row); return; }
+
+        if (e.target.closest('.editTask')) { openInlineEdit(row); return; }
         if (e.target.closest('.delTask')) {
             if (!confirm('Delete this task?')) return;
             try { await api('DELETE', `/api/work/${row.dataset.id}`); row.remove(); taskEmptyCheck(); toast('Deleted'); }
             catch (err) { toast(err.message); }
         }
+    });
+
+    // Enter = save, Escape = cancel in inline editor
+    $('#taskBody').addEventListener('keydown', e => {
+        const row = e.target.closest('tr.task-editing');
+        if (!row) return;
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveInlineEdit(row); }
+        if (e.key === 'Escape') cancelInlineEdit(row);
     });
     function rowHtml(w) {
         return `<td>${fmtDate(w.date)}</td>

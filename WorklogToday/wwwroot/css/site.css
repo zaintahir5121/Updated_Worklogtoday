@@ -371,7 +371,7 @@ table.t tbody tr:hover { background:var(--soft); }
         border-color:transparent;
         height:38px;
     }
-    .app-search input { font-size:14px; }
+    .app-search input { font-size:16px; }
     .bmc-btn { display:none; }
     .hide-mobile { display:none !important; }
     .btn-label { display:none; }
@@ -442,7 +442,10 @@ table.t tbody tr:hover { background:var(--soft); }
         padding:12px 16px;
     }
     .composer.expanded { border-radius:14px; }
-    .composer .cbody { font-size:14px; }
+    .composer .cbody { font-size:16px; }
+    /* Prevent iOS auto-zoom on focus — all inputs must be >= 16px */
+    input, textarea, select { font-size:16px !important; }
+    .nlabels-input { font-size:16px !important; }
     .notes-section-label { font-size:10px; margin:4px 2px 10px; }
 
     /* ── Tasks / Timesheet / Reports ── */
@@ -549,6 +552,68 @@ table.t tbody tr:hover { background:var(--soft); }
     #pane-tasks > div:first-child > div:last-child { display:flex; gap:8px; flex-wrap:wrap; }
 }
 
+
+/* ── Inline task editor row ── */
+.task-inline-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+}
+.task-inline-edit .ie-task {
+    width: 100%;
+    font-weight: 600;
+}
+.task-inline-edit .ie-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.task-inline-edit .ie-row input,
+.task-inline-edit .ie-row select {
+    flex: 1;
+    min-width: 80px;
+}
+.task-inline-edit .ie-hours {
+    max-width: 80px !important;
+    flex: 0 0 80px !important;
+}
+.task-inline-edit .ie-date {
+    max-width: 140px !important;
+    flex: 0 0 140px !important;
+}
+.task-inline-edit .ie-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.task-inline-edit label.ie-bill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+tr.task-editing td,
+tr.task-editing .task-editing-cell { padding: 10px 14px !important; background: #fffdf7; border-bottom: 2px solid var(--amber) !important; }
+
+/* ── Note backdrop (Google Keep open card feel) ── */
+.note-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.3);
+    z-index: 9;
+}
+.note-backdrop.on { display: block; }
+.note.note-open { position: relative; z-index: 10; }
+
+/* ── Composer placeholder behavior (Keep-style) ── */
+.composer .ctitle { display: none; }
+.composer.expanded .ctitle { display: block; }
 
 /* ── Legal pages (Privacy / Terms) ── */
 .legal-page { background:var(--bg); min-height:100vh; padding-bottom:60px; }
