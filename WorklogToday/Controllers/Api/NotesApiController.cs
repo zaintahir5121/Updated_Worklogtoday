@@ -25,7 +25,7 @@ public class NotesApiController : ControllerBase
         _ai = ai;
     }
 
-    public record NoteDto(string? Title, string Content, string? ColorHex, string? Labels);
+    public record NoteDto(string? Title, string Content, string? ColorHex, string? Labels, string? AudioUrl = null, string? Transcript = null);
 
     private string Uid => _users.GetUserId(User)!;
 
@@ -60,6 +60,8 @@ public class NotesApiController : ControllerBase
             Content = dto.Content?.Trim() ?? string.Empty,
             ColorHex = string.IsNullOrWhiteSpace(dto.ColorHex) ? "#ffffff" : dto.ColorHex!,
             Labels = NormalizeLabels(dto.Labels),
+            AudioUrl = dto.AudioUrl,
+            Transcript = dto.Transcript,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

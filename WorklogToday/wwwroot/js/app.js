@@ -88,7 +88,10 @@
 
     // Show confirmation when redirected back from PWA share target
     if (urlParams.get('shared') === '1') {
-        setTimeout(() => toast('Saved to your Notes from share ✓', 3000), 600);
+        const sharedTab = urlParams.get('tab');
+        if (sharedTab && TAB_ORDER.includes(sharedTab)) activateTab(sharedTab);
+        const label = sharedTab === 'tasks' ? 'Task logged from share ✓' : 'Saved to Notes from share ✓';
+        setTimeout(() => toast(label, 3000), 600);
         history.replaceState({}, '', '/app');
     }
 

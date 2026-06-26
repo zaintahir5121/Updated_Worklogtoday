@@ -2,6 +2,14 @@ using WorklogToday.Models.Domain;
 
 namespace WorklogToday.Models.ViewModels;
 
+public class ShareReceivedModel
+{
+    public string? Title    { get; set; }
+    public string? Body     { get; set; }
+    public string? AudioUrl { get; set; }
+    public bool    IsAudio  => !string.IsNullOrEmpty(AudioUrl);
+}
+
 public class ShareViewModel
 {
     public string ShareUserId { get; set; } = "";

@@ -1,0 +1,220 @@
+@model WorklogToday.Models.ViewModels.ShareReceivedModel
+@{
+    ViewData["Title"] = "Save shared content — worklog.today";
+    Layout = "_Layout";
+    var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+}
+@section Head { <meta name="robots" content="noindex" /> }
+
+@Html.AntiForgeryToken()
+
+<style>
+.sr-wrap { max-width: 480px; margin: 0 auto; padding: 24px 16px 40px; }
+.sr-logo  { display:flex; align-items:center; gap:8px; font-weight:800; font-size:17px; letter-spacing:-.3px; margin-bottom:24px; }
+.sr-logo .mark { width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--amber),var(--amber-2));display:grid;place-items:center;color:#fff;font-size:14px; }
+.sr-logo .dot  { color:var(--amber); }
+.sr-card  { background:#fff; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.09); padding:18px; margin-bottom:20px; }
+.sr-tag   { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; border-radius:100px; padding:3px 10px; margin-bottom:10px; }
+.sr-tag.audio { color:#ef4444; background:#fef2f2; border:1px solid #fca5a5; }
+.sr-tag.text  { color:#1d4ed8; background:#eff6ff; border:1px solid #bfdbfe; }
+.sr-preview { font-size:14px; color:var(--ink); line-height:1.6; white-space:pre-wrap; word-break:break-word; max-height:140px; overflow:hidden; position:relative; }
+.sr-preview::after { content:''; position:absolute; bottom:0; left:0; right:0; height:32px; background:linear-gradient(transparent,#fff); }
+audio.sr-audio { width:100%; height:40px; border-radius:20px; margin-top:8px; accent-color:var(--amber); }
+.sr-choice-label { font-size:13px; font-weight:700; color:var(--muted); margin-bottom:12px; text-align:center; }
+.sr-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.sr-btn { display:flex; flex-direction:column; align-items:center; gap:6px; padding:18px 12px; border-radius:14px; border:1.5px solid var(--line); background:#fff; cursor:pointer; font-family:inherit; transition:.15s; text-decoration:none; }
+.sr-btn:hover { border-color:var(--amber); box-shadow:0 4px 14px rgba(245,158,11,.18); transform:translateY(-1px); }
+.sr-btn i { font-size:26px; }
+.sr-btn .sr-btn-label { font-size:13px; font-weight:700; color:var(--ink); }
+.sr-btn .sr-btn-sub { font-size:11px; color:var(--muted); text-align:center; }
+.sr-btn.note i { color:#f59e0b; }
+.sr-btn.task i { color:#10b981; }
+
+/* Task quick-form (hidden by default) */
+.sr-task-form { display:none; margin-top:20px; }
+.sr-task-form.show { display:block; }
+.field { margin-bottom:14px; }
+.lbl { display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; }
+.input { width:100%; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; font-size:14px; font-family:inherit; color:var(--ink); outline:none; background:#fff; transition:.15s; }
+.input:focus { border-color:var(--amber); box-shadow:0 0 0 3px rgba(245,158,11,.12); }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.btn { display:inline-flex; align-items:center; gap:7px; border:none; border-radius:999px; font-weight:600; cursor:pointer; padding:11px 22px; font-size:15px; font-family:inherit; transition:.15s; width:100%; justify-content:center; }
+.btn-amber { background:linear-gradient(135deg,var(--amber),var(--amber-2)); color:#fff; box-shadow:0 4px 14px rgba(245,158,11,.35); }
+.btn-ghost { background:transparent; color:var(--ink); border:1.5px solid var(--line); }
+</style>
+
+<div class="sr-wrap">
+  <div class="sr-logo">
+    <div class="mark"><i class="bi bi-journal-text"></i></div>
+    worklog<span class="dot">.today</span>
+  </div>
+
+  <!-- Preview of shared content -->
+  <div class="sr-card">
+    @if (Model.IsAudio)
+    {
+        <div class="sr-tag audio"><i class="bi bi-mic-fill"></i> Voice note</div>
+        <audio class="sr-audio" controls preload="auto" src="@Model.AudioUrl"></audio>
+        @if (!string.IsNullOrWhiteSpace(Model.Body))
+        {
+            <div class="sr-preview" style="margin-top:10px">@Model.Body</div>
+        }
+    }
+    else
+    {
+        <div class="sr-tag text"><i class="bi bi-chat-quote"></i> Text</div>
+        @if (!string.IsNullOrWhiteSpace(Model.Title))
+        {
+            <div style="font-weight:700;font-size:15px;margin-bottom:6px">@Model.Title</div>
+        }
+        <div class="sr-preview">@(Model.Body ?? "(nothing shared)")</div>
+    }
+  </div>
+
+  <!-- Choice -->
+  <div class="sr-choice-label">Where do you want to save this?</div>
+  <div class="sr-buttons">
+    <button class="sr-btn note" id="chooseNote" type="button">
+      <i class="bi bi-sticky"></i>
+      <span class="sr-btn-label">Save as Note</span>
+      <span class="sr-btn-sub">Appears in your Notes tab</span>
+    </button>
+    <button class="sr-btn task" id="chooseTask" type="button">
+      <i class="bi bi-list-check"></i>
+      <span class="sr-btn-label">Log as Task</span>
+      <span class="sr-btn-sub">Appears in your Tasks tab</span>
+    </button>
+  </div>
+
+  <!-- Quick task form -->
+  <div class="sr-task-form" id="taskForm">
+    <div class="sr-card" style="margin-top:0">
+      <div class="field">
+        <label class="lbl">Task description</label>
+        <input id="tfTask" class="input" value="@(Model.Body?.Split('\n').FirstOrDefault()?.Trim() ?? Model.Title ?? "")" placeholder="What did you work on?" />
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label class="lbl">Project</label>
+          <input id="tfProject" class="input" placeholder="Project / client" />
+        </div>
+        <div class="field">
+          <label class="lbl">Date</label>
+          <input id="tfDate" type="date" class="input" value="@today" />
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label class="lbl">Category</label>
+          <select id="tfCategory" class="input">
+            <option value="0">Development</option>
+            <option value="1">Meeting</option>
+            <option value="2">Support</option>
+            <option value="3">Review</option>
+            <option value="4">Planning</option>
+            <option value="5">Research</option>
+            <option value="6">Documentation</option>
+            <option value="7">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl">Hours</label>
+          <input id="tfHours" type="number" step="0.25" min="0.25" max="24" class="input" value="1" />
+        </div>
+      </div>
+      <button class="btn btn-amber" id="saveTaskBtn" type="button"><i class="bi bi-check-lg"></i> Log task</button>
+      <button class="btn btn-ghost" id="cancelTaskBtn" type="button" style="margin-top:8px">Back</button>
+    </div>
+  </div>
+</div>
+
+@section Scripts {
+@{
+    var jsTitle   = System.Text.Json.JsonSerializer.Serialize(Model.Title ?? "");
+    var jsBody    = System.Text.Json.JsonSerializer.Serialize(Model.Body ?? "");
+    var jsAudio   = System.Text.Json.JsonSerializer.Serialize(Model.AudioUrl ?? "");
+    var jsIsAudio = Model.IsAudio ? "true" : "false";
+    var jsTaskNotes = System.Text.Json.JsonSerializer.Serialize(Model.IsAudio ? ("[Voice] " + (Model.Body ?? "")).Trim() : (Model.Body ?? ""));
+    var jsFirstLine = System.Text.Json.JsonSerializer.Serialize((Model.Body ?? Model.Title ?? "").Split('\n').FirstOrDefault()?.Trim() ?? "");
+}
+<script>
+(function () {
+  const TOKEN    = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+  const audioUrl = @jsAudio;
+  const isAudio  = @jsIsAudio;
+  const sharedTitle = @jsTitle;
+  const sharedBody  = @jsBody;
+
+  async function api(method, url, data) {
+    const r = await fetch(url, {
+      method,
+      headers: { 'RequestVerificationToken': TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error || 'Failed'); }
+    return r.json();
+  }
+
+  // ── Save as Note ──
+  document.getElementById('chooseNote').addEventListener('click', async function () {
+    this.disabled = true;
+    this.innerHTML = '<i class="bi bi-hourglass-split"></i><span class="sr-btn-label">Saving…</span>';
+    try {
+      await api('POST', '/api/notes', {
+        title:    sharedTitle || null,
+        content:  sharedBody || (isAudio ? '[Voice note]' : '(shared)'),
+        colorHex: '#ffffff',
+        labels:   null,
+        audioUrl: isAudio ? audioUrl : null,
+        transcript: isAudio ? (sharedBody || null) : null
+      });
+      window.location.href = '/app?shared=1&tab=notes';
+    } catch (e) {
+      alert(e.message);
+      this.disabled = false;
+      this.innerHTML = '<i class="bi bi-sticky"></i><span class="sr-btn-label">Save as Note</span><span class="sr-btn-sub">Appears in your Notes tab</span>';
+    }
+  });
+
+  // ── Log as Task — show form ──
+  document.getElementById('chooseTask').addEventListener('click', function () {
+    document.getElementById('taskForm').classList.add('show');
+    document.querySelector('.sr-buttons').style.opacity = '.4';
+    document.querySelector('.sr-choice-label').style.display = 'none';
+    document.querySelector('.sr-buttons').style.pointerEvents = 'none';
+    document.getElementById('tfTask').focus();
+  });
+  document.getElementById('cancelTaskBtn').addEventListener('click', function () {
+    document.getElementById('taskForm').classList.remove('show');
+    document.querySelector('.sr-buttons').style.opacity = '';
+    document.querySelector('.sr-choice-label').style.display = '';
+    document.querySelector('.sr-buttons').style.pointerEvents = '';
+  });
+
+  // ── Save as Task ──
+  document.getElementById('saveTaskBtn').addEventListener('click', async function () {
+    const task = document.getElementById('tfTask').value.trim();
+    if (!task) { alert('Please enter a task description'); return; }
+    this.disabled = true;
+    this.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+    try {
+      await api('POST', '/api/work', {
+        task:     task,
+        project:  document.getElementById('tfProject').value.trim() || null,
+        category: +document.getElementById('tfCategory').value,
+        status:   2,
+        hours:    +document.getElementById('tfHours').value,
+        date:     document.getElementById('tfDate').value,
+        billable: true,
+        notes:    @jsTaskNotes
+      });
+      window.location.href = '/app?shared=1&tab=tasks';
+    } catch (e) {
+      alert(e.message);
+      this.disabled = false;
+      this.innerHTML = '<i class="bi bi-check-lg"></i> Log task';
+    }
+  });
+})();
+</script>
+}

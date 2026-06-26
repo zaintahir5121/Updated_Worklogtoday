@@ -22,7 +22,9 @@ public class ShareController : Controller
     }
 
     // ── PWA Web Share Target ────────────────────────────────────────────────
-    // Called by the OS share sheet when the user picks "worklog.today"
+    // Called by the OS share sheet when the user picks "worklog.today".
+    // Saves any audio to disk then shows the Received page so the user can
+    // choose: Save as Note  OR  Log as Task.
     [HttpPost]
     [Authorize]
     [IgnoreAntiforgeryToken]
@@ -37,8 +39,7 @@ public class ShareController : Controller
     {
         var uid = _users.GetUserId(User)!;
         var attachment = audio ?? file;
-
-        Note note;
+        string? audioUrl = null;
 
         if (attachment != null && attachment.Length > 0 && IsAudio(attachment.ContentType))
         {
@@ -46,42 +47,31 @@ public class ShareController : Controller
             var fileName = $"share_{uid}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}";
             var dir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "voice");
             Directory.CreateDirectory(dir);
-            var path = Path.Combine(dir, fileName);
-            using (var fs = System.IO.File.Create(path))
+            using (var fs = System.IO.File.Create(Path.Combine(dir, fileName)))
                 await attachment.CopyToAsync(fs, ct);
-
-            note = new Note
-            {
-                UserId = uid,
-                Title = string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
-                Content = string.IsNullOrWhiteSpace(text) ? "[Shared voice note]" : text.Trim(),
-                AudioUrl = $"/uploads/voice/{fileName}",
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-        }
-        else
-        {
-            var parts = new List<string>();
-            if (!string.IsNullOrWhiteSpace(text)) parts.Add(text.Trim());
-            if (!string.IsNullOrWhiteSpace(url))  parts.Add(url.Trim());
-            var content = parts.Count > 0 ? string.Join("\n", parts) : "(empty share)";
-
-            note = new Note
-            {
-                UserId = uid,
-                Title = string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
-                Content = content,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
+            audioUrl = $"/uploads/voice/{fileName}";
         }
 
-        _db.Notes.Add(note);
-        await _db.SaveChangesAsync(ct);
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(text)) parts.Add(text.Trim());
+        if (!string.IsNullOrWhiteSpace(url))  parts.Add(url.Trim());
+        var body = string.Join("\n", parts);
 
-        return Redirect("/app?shared=1");
+        // Show the choice page — note vs task
+        TempData["share_title"]    = title?.Trim();
+        TempData["share_body"]     = body;
+        TempData["share_audioUrl"] = audioUrl;
+        return RedirectToAction(nameof(Received));
     }
+
+    [HttpGet("received")]
+    [Authorize]
+    public IActionResult Received() => View("Received", new ShareReceivedModel
+    {
+        Title    = TempData["share_title"]    as string,
+        Body     = TempData["share_body"]     as string,
+        AudioUrl = TempData["share_audioUrl"] as string
+    });
 
     private static bool IsAudio(string? ct) =>
         ct != null && (ct.StartsWith("audio/") || ct.Contains("ogg") || ct.Contains("opus"));
