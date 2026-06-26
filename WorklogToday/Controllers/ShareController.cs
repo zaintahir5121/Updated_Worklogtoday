@@ -57,21 +57,21 @@ public class ShareController : Controller
         if (!string.IsNullOrWhiteSpace(url))  parts.Add(url.Trim());
         var body = string.Join("\n", parts);
 
-        // Show the choice page — note vs task
-        TempData["share_title"]    = title?.Trim();
-        TempData["share_body"]     = body;
-        TempData["share_audioUrl"] = audioUrl;
-        return RedirectToAction(nameof(Received));
+        // Save directly as a note — no choice page needed
+        var note = new Note
+        {
+            UserId    = uid,
+            Title     = string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
+            Content   = string.IsNullOrWhiteSpace(body) ? (audioUrl != null ? "[Voice note]" : "(shared)") : body,
+            AudioUrl  = audioUrl,
+            Transcript = audioUrl != null && !string.IsNullOrWhiteSpace(body) ? body : null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        _db.Notes.Add(note);
+        await _db.SaveChangesAsync(ct);
+        return Redirect("/app?shared=1");
     }
-
-    [HttpGet("received")]
-    [Authorize]
-    public IActionResult Received() => View("Received", new ShareReceivedModel
-    {
-        Title    = TempData["share_title"]    as string,
-        Body     = TempData["share_body"]     as string,
-        AudioUrl = TempData["share_audioUrl"] as string
-    });
 
     private static bool IsAudio(string? ct) =>
         ct != null && (ct.StartsWith("audio/") || ct.Contains("ogg") || ct.Contains("opus"));
