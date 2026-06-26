@@ -285,15 +285,18 @@
         const swatches = COLORS.map(c =>
             `<span class="nsw${c === n.colorHex ? ' active' : ''}" style="background:${c}" data-color="${c}"></span>`
         ).join('');
-        const audioBlock = n.audioUrl
-            ? `<div class="note-audio"><audio controls preload="none" src="${esc(n.audioUrl)}"></audio>${n.transcript ? `<div class="note-transcript">${esc(n.transcript)}</div>` : ''}</div>`
-            : '';
+        const audioBlock = n.audioUrl ? `
+          <div class="note-audio-block">
+            <span class="note-audio-chip"><i class="bi bi-mic-fill"></i> Voice</span>
+            <audio controls preload="none" src="${esc(n.audioUrl)}"></audio>
+            ${n.transcript ? `<p class="note-audio-transcript">${esc(n.transcript)}</p>` : ''}
+          </div>` : '';
+        const bodyText = n.audioUrl && (n.content === '[Voice note]' || n.content === '[Shared voice note]') ? '' : n.content || '';
         return `
           <button class="mini-btn pin ${n.isPinned ? 'on' : ''}" type="button" data-act="pin" title="Pin note"><i class="bi ${n.isPinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}"></i></button>
-          ${n.audioUrl ? '<span class="note-voice-badge"><i class="bi bi-mic-fill"></i></span>' : ''}
           <div class="ntitle-edit" contenteditable="true" data-placeholder="Title" spellcheck="true">${esc(n.title || '')}</div>
           ${audioBlock}
-          <div class="ntext-edit" contenteditable="true" data-placeholder="Add a note…" spellcheck="true">${esc(n.content || '')}</div>
+          <div class="ntext-edit" contenteditable="true" data-placeholder="Add a note…" spellcheck="true">${esc(bodyText)}</div>
           <div class="nlabels">${labels.map(l => `<span class="nlabel">${esc(l)}</span>`).join('')}</div>
           <div class="note-expanded-tools">
             <div class="note-swatches">${swatches}</div>

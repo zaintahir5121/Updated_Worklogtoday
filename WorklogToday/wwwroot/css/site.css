@@ -773,6 +773,24 @@ tr.task-editing .task-editing-cell { padding: 10px 14px !important; background: 
     .fab-sub:active { transform:scale(.93); }
 }
 
+/* ── Voice audio block inside standard note card ── */
+.note-audio-block { margin: 6px 0 8px; }
+.note-audio-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    color: #ef4444; background: #fef2f2; border: 1px solid #fca5a5;
+    border-radius: 100px; padding: 2px 8px; margin-bottom: 6px;
+}
+.note-audio-block audio {
+    width: 100%; height: 34px; border-radius: 20px; display: block;
+    accent-color: var(--amber);
+}
+.note-audio-transcript {
+    margin: 5px 0 0;
+    font-size: 12px; color: var(--muted); line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
 /* ── Voice notes (global) ── */
 .voice-record-btn {
     width:80px; height:80px; border-radius:50%; border:none; cursor:pointer;
@@ -808,16 +826,6 @@ tr.task-editing .task-editing-cell { padding: 10px 14px !important; background: 
     50%      { height:28px; opacity:1; }
 }
 
-.note-audio { margin:8px 0; }
-.note-audio audio { width:100%; height:36px; border-radius:8px; }
-.note-transcript {
-    font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5;
-    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
-}
-.note-voice-badge {
-    display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600;
-    color:#ef4444; background:#fef2f2; border-radius:100px; padding:2px 8px; margin-bottom:6px;
-}
 
 @keyframes fab-in {
     from { opacity:0; transform:scale(.7) translateY(12px); }
