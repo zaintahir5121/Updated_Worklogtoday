@@ -32,6 +32,7 @@ public class NotesApiController : ControllerBase
     private static object Shape(Note n) => new
     {
         n.Id, n.Title, n.Content, n.ColorHex, n.Labels, n.IsPinned, n.IsArchived,
+        n.AudioUrl, n.Transcript,
         updatedAt = n.UpdatedAt
     };
 
@@ -145,6 +146,52 @@ public class NotesApiController : ControllerBase
         var result = await _ai.SuggestLabelsAsync(dto.Title ?? string.Empty, dto.Content ?? string.Empty, ct);
         return Ok(new { labels = result.Text, source = result.Source });
     }
+
+    [HttpPost("voice")]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<IActionResult> UploadVoice(IFormFile audio, string? transcript, CancellationToken ct)
+    {
+        if (audio == null || audio.Length == 0)
+            return BadRequest(new { error = "No audio file provided." });
+
+        var allowed = new[] { "audio/webm", "audio/ogg", "audio/mp4", "audio/wav", "audio/mpeg" };
+        var mimeType = audio.ContentType.Split(';')[0].Trim().ToLowerInvariant();
+        if (!allowed.Any(a => mimeType.StartsWith(a.Split('/')[0]) && mimeType.Contains(a.Split('/')[1].Split('-')[0])))
+            return BadRequest(new { error = "Unsupported audio format." });
+
+        var ext = GetAudioExt(mimeType);
+        var fileName = $"voice_{Uid}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}";
+        var dir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "voice");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, fileName);
+
+        using (var fs = System.IO.File.Create(path))
+            await audio.CopyToAsync(fs, ct);
+
+        var audioUrl = $"/uploads/voice/{fileName}";
+
+        var note = new Note
+        {
+            UserId = Uid,
+            Content = string.IsNullOrWhiteSpace(transcript) ? "[Voice note]" : transcript.Trim(),
+            Transcript = transcript?.Trim(),
+            AudioUrl = audioUrl,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        _db.Notes.Add(note);
+        await _db.SaveChangesAsync(ct);
+        return Ok(Shape(note));
+    }
+
+    private static string GetAudioExt(string mime) => mime switch
+    {
+        var s when s.Contains("webm") => ".webm",
+        var s when s.Contains("ogg") => ".ogg",
+        var s when s.Contains("mp4") => ".m4a",
+        var s when s.Contains("wav") => ".wav",
+        _ => ".audio"
+    };
 
     private Task<Note?> Find(int id) =>
         _db.Notes.FirstOrDefaultAsync(n => n.Id == id && n.UserId == Uid);

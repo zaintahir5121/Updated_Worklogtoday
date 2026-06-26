@@ -41,7 +41,7 @@
         localStorage.setItem('wt_tab', name);
         if (name === 'reports') loadReports();
 
-        const fab = $('#mobileFab');
+        const fab = $('#fabGroup') || $('#mobileFab');
         if (fab) fab.style.display = name === 'notes' ? '' : 'none';
 
         // Update swipe indicator dots
@@ -151,9 +151,35 @@
 
     // ---------- Mobile FAB ----------
     const mobileFab = $('#mobileFab');
+    const fabGroup = $('#fabGroup');
+    let fabOpen = false;
+
+    function toggleFab(open) {
+        fabOpen = open;
+        const fabVoice = $('#fabVoice'), fabText = $('#fabText');
+        if (fabVoice) fabVoice.style.display = open ? '' : 'none';
+        if (fabText) fabText.style.display = open ? '' : 'none';
+        if (mobileFab) {
+            mobileFab.querySelector('i').className = open ? 'bi bi-x-lg' : 'bi bi-plus';
+        }
+    }
+
     if (mobileFab) {
         mobileFab.addEventListener('click', e => {
-            e.stopPropagation(); // prevent document handler from immediately collapsing
+            e.stopPropagation();
+            if (fabOpen) {
+                toggleFab(false);
+            } else {
+                toggleFab(true);
+            }
+        });
+    }
+
+    const fabText = $('#fabText');
+    if (fabText) {
+        fabText.addEventListener('click', e => {
+            e.stopPropagation();
+            toggleFab(false);
             const composer = $('#composer');
             const body = $('#cBody');
             if (composer && body) {
@@ -163,6 +189,19 @@
             }
         });
     }
+
+    const fabVoice = $('#fabVoice');
+    if (fabVoice) {
+        fabVoice.addEventListener('click', e => {
+            e.stopPropagation();
+            toggleFab(false);
+            openVoiceModal();
+        });
+    }
+
+    document.addEventListener('click', e => {
+        if (fabOpen && fabGroup && !fabGroup.contains(e.target)) toggleFab(false);
+    });
 
     // ---------- PWA install ----------
     let deferredPrompt = null;
@@ -239,9 +278,14 @@
         const swatches = COLORS.map(c =>
             `<span class="nsw${c === n.colorHex ? ' active' : ''}" style="background:${c}" data-color="${c}"></span>`
         ).join('');
+        const audioBlock = n.audioUrl
+            ? `<div class="note-audio"><audio controls preload="none" src="${esc(n.audioUrl)}"></audio>${n.transcript ? `<div class="note-transcript">${esc(n.transcript)}</div>` : ''}</div>`
+            : '';
         return `
           <button class="mini-btn pin ${n.isPinned ? 'on' : ''}" type="button" data-act="pin" title="Pin note"><i class="bi ${n.isPinned ? 'bi-pin-angle-fill' : 'bi-pin-angle'}"></i></button>
+          ${n.audioUrl ? '<span class="note-voice-badge"><i class="bi bi-mic-fill"></i></span>' : ''}
           <div class="ntitle-edit" contenteditable="true" data-placeholder="Title" spellcheck="true">${esc(n.title || '')}</div>
+          ${audioBlock}
           <div class="ntext-edit" contenteditable="true" data-placeholder="Add a note…" spellcheck="true">${esc(n.content || '')}</div>
           <div class="nlabels">${labels.map(l => `<span class="nlabel">${esc(l)}</span>`).join('')}</div>
           <div class="note-expanded-tools">
@@ -467,6 +511,147 @@
     const newStickyBtn = document.getElementById('newStickyBtn');
     if (newStickyBtn) newStickyBtn.addEventListener('click', () =>
         window.open('/sticky/new', 'sticky-new-' + Date.now(), 'popup=yes,width=300,height=330'));
+
+    // ---------- Voice Notes ----------
+    let mediaRecorder = null, audioChunks = [], voiceBlob = null, voiceTranscript = '';
+    let voiceTimerInterval = null, voiceSeconds = 0;
+    let recognition = null;
+
+    function openVoiceModal() {
+        voiceBlob = null; voiceTranscript = ''; audioChunks = [];
+        $('#voiceStatus').textContent = 'Press the button and start speaking.';
+        $('#voiceTimer').style.display = 'none';
+        $('#voiceWaveWrap').style.display = 'none';
+        $('#voiceTranscriptPreview').style.display = 'none';
+        $('#voiceTranscriptPreview').textContent = '';
+        $('#voiceSaveBtn').disabled = true;
+        const btn = $('#voiceRecordBtn');
+        btn.classList.remove('recording');
+        btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+        $('#voiceModal').classList.add('open');
+    }
+
+    function formatVoiceTime(s) {
+        return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+    }
+
+    $('#voiceNoteBtn').addEventListener('click', e => { e.stopPropagation(); openVoiceModal(); });
+
+    function stopRecordingIfActive() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+            if (recognition) { try { recognition.stop(); } catch {} }
+            clearInterval(voiceTimerInterval);
+            $('#voiceRecordBtn').classList.remove('recording');
+            $('#voiceRecordBtn').innerHTML = '<i class="bi bi-mic-fill"></i>';
+        }
+    }
+
+    $('#voiceModal').addEventListener('click', e => {
+        if (e.target === $('#voiceModal')) stopRecordingIfActive();
+    });
+    $$('[data-close]', $('#voiceModal')).forEach(b => b.addEventListener('click', stopRecordingIfActive));
+
+    $('#voiceRecordBtn').addEventListener('click', async () => {
+        const btn = $('#voiceRecordBtn');
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            // Stop recording
+            mediaRecorder.stop();
+            if (recognition) { try { recognition.stop(); } catch {} }
+            clearInterval(voiceTimerInterval);
+            btn.classList.remove('recording');
+            btn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+            $('#voiceStatus').textContent = 'Recording saved. Press Save to add as a note.';
+            $('#voiceWaveWrap').style.display = 'none';
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioChunks = []; voiceTranscript = ''; voiceSeconds = 0;
+
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+                : MediaRecorder.isTypeSupported('audio/ogg') ? 'audio/ogg'
+                : '';
+            mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(t => t.stop());
+                voiceBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                $('#voiceSaveBtn').disabled = false;
+                const tp = $('#voiceTranscriptPreview');
+                if (voiceTranscript) { tp.textContent = voiceTranscript; tp.style.display = ''; }
+            };
+            mediaRecorder.start(250);
+
+            btn.classList.add('recording');
+            btn.innerHTML = '<i class="bi bi-stop-fill"></i>';
+            $('#voiceStatus').textContent = 'Recording… tap the button to stop.';
+            $('#voiceTimer').style.display = '';
+            $('#voiceTimer').textContent = '0:00';
+            $('#voiceWaveWrap').style.display = '';
+            voiceTimerInterval = setInterval(() => {
+                voiceSeconds++;
+                $('#voiceTimer').textContent = formatVoiceTime(voiceSeconds);
+                if (voiceSeconds >= 300) { // 5 min max
+                    $('#voiceRecordBtn').click();
+                }
+            }, 1000);
+
+            // Web Speech API for live transcription
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SR();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = navigator.language || 'en-US';
+                let finalTranscript = '';
+                recognition.onresult = e => {
+                    let interim = '';
+                    for (let i = e.resultIndex; i < e.results.length; i++) {
+                        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + ' ';
+                        else interim += e.results[i][0].transcript;
+                    }
+                    voiceTranscript = (finalTranscript + interim).trim();
+                    const tp = $('#voiceTranscriptPreview');
+                    tp.textContent = voiceTranscript || '';
+                    if (voiceTranscript) tp.style.display = '';
+                };
+                recognition.onerror = () => {};
+                try { recognition.start(); } catch {}
+            }
+        } catch (err) {
+            toast('Microphone access denied. Please allow microphone in browser settings.');
+        }
+    });
+
+    $('#voiceSaveBtn').addEventListener('click', async () => {
+        if (!voiceBlob) return;
+        const btn = $('#voiceSaveBtn');
+        btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+        try {
+            const ext = voiceBlob.type.includes('ogg') ? '.ogg' : voiceBlob.type.includes('mp4') ? '.m4a' : '.webm';
+            const fd = new FormData();
+            fd.append('audio', voiceBlob, 'voice' + ext);
+            if (voiceTranscript) fd.append('transcript', voiceTranscript);
+            const res = await fetch('/api/notes/voice', {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': TOKEN },
+                body: fd
+            });
+            if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Upload failed'); }
+            const note = await res.json();
+            addNoteToDom(note, true);
+            $('#notesEmpty').style.display = 'none';
+            $('#voiceModal').classList.remove('open');
+            toast('Voice note saved');
+            if (currentTab !== 'notes') activateTab('notes');
+        } catch (e) {
+            toast(e.message);
+            btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i> Save note';
+        }
+    });
 
     // ---------- Search ----------
     $('#noteSearch').addEventListener('input', e => {

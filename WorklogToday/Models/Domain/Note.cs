@@ -27,4 +27,10 @@ public class Note
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+    [StringLength(500)]
+    public string? AudioUrl { get; set; }
+
+    [StringLength(8000)]
+    public string? Transcript { get; set; }
 }

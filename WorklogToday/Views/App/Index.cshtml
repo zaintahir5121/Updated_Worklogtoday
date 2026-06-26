@@ -66,6 +66,7 @@
                         <span class="sw @(c == "#ffffff" ? "active" : "")" style="background:@c" data-color="@c"></span>
                     }
                 </div>
+                <button class="btn btn-ghost btn-sm" id="voiceNoteBtn" type="button" title="Record voice note"><i class="bi bi-mic"></i> Voice</button>
                 <button class="btn btn-ghost btn-sm" id="aiLabelBtn" type="button" title="Smart AI tag suggestions"><i class="bi bi-magic"></i> AI tags</button>
                 <button class="btn btn-ghost btn-sm" id="askAiBtn" type="button" title="Ask AI about your notes"><i class="bi bi-chat-dots"></i> Ask AI</button>
                 <input id="cLabels" class="input" style="flex:1;min-width:100px;padding:7px 10px" placeholder="labels (comma separated)" />
@@ -503,6 +504,31 @@
     </div>
 </div>
 
+<!-- Voice note modal -->
+<div class="modal-bg" id="voiceModal">
+    <div class="modal" style="max-width:440px;text-align:center">
+        <div class="mh">
+            <span><i class="bi bi-mic" style="color:#ef4444"></i> Voice Note</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb" style="padding:28px 24px">
+            <div id="voiceStatus" style="color:var(--muted);font-size:13px;margin-bottom:18px">Press the button and start speaking. Your voice will be transcribed automatically.</div>
+            <button class="voice-record-btn" id="voiceRecordBtn" type="button">
+                <i class="bi bi-mic-fill"></i>
+            </button>
+            <div id="voiceTimer" style="font-size:28px;font-weight:700;font-family:monospace;margin:16px 0 8px;display:none">0:00</div>
+            <div id="voiceWaveWrap" style="display:none;margin:8px 0">
+                <div class="voice-wave"><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div id="voiceTranscriptPreview" style="min-height:48px;padding:10px;background:var(--soft);border-radius:10px;font-size:13.5px;color:var(--ink);text-align:left;margin-top:16px;display:none"></div>
+        </div>
+        <div class="mf" style="justify-content:center;gap:10px">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="voiceSaveBtn" disabled><i class="bi bi-check-lg"></i> Save note</button>
+        </div>
+    </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Friday nudge banner -->
@@ -591,8 +617,12 @@
     </button>
 </nav>
 
-<!-- Mobile FAB -->
-<button class="fab" id="mobileFab" type="button" title="New note"><i class="bi bi-plus"></i></button>
+<!-- Mobile FAB group -->
+<div class="fab-group" id="fabGroup">
+    <button class="fab fab-sub" id="fabVoice" type="button" title="Voice note" style="display:none"><i class="bi bi-mic-fill"></i></button>
+    <button class="fab fab-sub" id="fabText" type="button" title="Text note" style="display:none"><i class="bi bi-pencil"></i></button>
+    <button class="fab" id="mobileFab" type="button" title="New note"><i class="bi bi-plus"></i></button>
+</div>
 
 @section Scripts {
     <script src="~/js/app.js" asp-append-version="true"></script>
