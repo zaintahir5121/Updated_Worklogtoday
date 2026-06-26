@@ -21,6 +21,82 @@ public class ShareController : Controller
         _users = users;
     }
 
+    // ── PWA Web Share Target ────────────────────────────────────────────────
+    // Called by the OS share sheet when the user picks "worklog.today"
+    [HttpPost]
+    [Authorize]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(25_000_000)]
+    public async Task<IActionResult> Receive(
+        [FromForm] string? title,
+        [FromForm] string? text,
+        [FromForm] string? url,
+        IFormFile? audio,
+        IFormFile? file,
+        CancellationToken ct)
+    {
+        var uid = _users.GetUserId(User)!;
+        var attachment = audio ?? file;
+
+        Note note;
+
+        if (attachment != null && attachment.Length > 0 && IsAudio(attachment.ContentType))
+        {
+            var ext = AudioExt(attachment.ContentType);
+            var fileName = $"share_{uid}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}";
+            var dir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "voice");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, fileName);
+            using (var fs = System.IO.File.Create(path))
+                await attachment.CopyToAsync(fs, ct);
+
+            note = new Note
+            {
+                UserId = uid,
+                Title = string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
+                Content = string.IsNullOrWhiteSpace(text) ? "[Shared voice note]" : text.Trim(),
+                AudioUrl = $"/uploads/voice/{fileName}",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+        else
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(text)) parts.Add(text.Trim());
+            if (!string.IsNullOrWhiteSpace(url))  parts.Add(url.Trim());
+            var content = parts.Count > 0 ? string.Join("\n", parts) : "(empty share)";
+
+            note = new Note
+            {
+                UserId = uid,
+                Title = string.IsNullOrWhiteSpace(title) ? null : title.Trim(),
+                Content = content,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        _db.Notes.Add(note);
+        await _db.SaveChangesAsync(ct);
+
+        return Redirect("/app?shared=1");
+    }
+
+    private static bool IsAudio(string? ct) =>
+        ct != null && (ct.StartsWith("audio/") || ct.Contains("ogg") || ct.Contains("opus"));
+
+    private static string AudioExt(string ct) => ct switch
+    {
+        var s when s.Contains("webm") => ".webm",
+        var s when s.Contains("ogg") || s.Contains("opus") => ".ogg",
+        var s when s.Contains("mp4") || s.Contains("m4a") => ".m4a",
+        var s when s.Contains("wav") => ".wav",
+        var s when s.Contains("mpeg") || s.Contains("mp3") => ".mp3",
+        _ => ".audio"
+    };
+    // ───────────────────────────────────────────────────────────────────────
+
     [HttpGet("{userId}")]
     public async Task<IActionResult> Week(string userId, int week = 0)
     {

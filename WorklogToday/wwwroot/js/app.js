@@ -80,10 +80,17 @@
 
     $$('.app-tab').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
     $$('.bottom-nav-item').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
-    const urlTab = new URLSearchParams(location.search).get('tab');
+    const urlParams = new URLSearchParams(location.search);
+    const urlTab = urlParams.get('tab');
     const savedTab = urlTab || localStorage.getItem('wt_tab');
     currentTab = (savedTab && TAB_ORDER.includes(savedTab)) ? savedTab : 'notes';
     activateTab(currentTab);
+
+    // Show confirmation when redirected back from PWA share target
+    if (urlParams.get('shared') === '1') {
+        setTimeout(() => toast('Saved to your Notes from share ✓', 3000), 600);
+        history.replaceState({}, '', '/app');
+    }
 
     // ---------- Swipe between tabs (mobile) ----------
     (function () {
