@@ -166,9 +166,10 @@
 
     function toggleFab(open) {
         fabOpen = open;
-        const fabVoice = $('#fabVoice'), fabText = $('#fabText');
+        const fabVoice = $('#fabVoice'), fabText = $('#fabText'), fabSmart2 = $('#fabSmart');
         if (fabVoice) fabVoice.style.display = open ? '' : 'none';
         if (fabText) fabText.style.display = open ? '' : 'none';
+        if (fabSmart2) fabSmart2.style.display = open ? '' : 'none';
         if (mobileFab) {
             mobileFab.querySelector('i').className = open ? 'bi bi-x-lg' : 'bi bi-plus';
         }
@@ -665,6 +666,227 @@
             btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i> Save note';
         }
     });
+
+    // ---------- Smart Meeting Note ----------
+    let smRecorder = null, smAudioChunks = [], smRecognition = null;
+    let smTimerInterval = null, smSeconds = 0;
+    let smTranscript = '', smFinalTranscript = '';
+    let smRecording = false;
+
+    function openSmartMeeting() {
+        smTranscript = ''; smFinalTranscript = ''; smAudioChunks = []; smSeconds = 0;
+        $('#smRecordPhase').style.display = '';
+        $('#smGeneratingPhase').style.display = 'none';
+        $('#smPreviewPhase').style.display = 'none';
+        $('#smStopBtn').style.display = 'none';
+        $('#smSaveBtn').style.display = 'none';
+        $('#smCancelBtn').style.display = '';
+        $('#smStatus').innerHTML = 'Press <strong>Start</strong> to record your meeting. Say <strong>"end meeting"</strong> to stop automatically.';
+        $('#smTimer').style.display = 'none';
+        $('#smWaveWrap').style.display = 'none';
+        $('#smTranscriptBox').style.display = 'none';
+        $('#smTranscriptText').textContent = '';
+        $('#smHint').style.display = '';
+        $('#smRecordBtn').classList.remove('recording');
+        $('#smRecordBtn').innerHTML = '<i class="bi bi-play-fill"></i>';
+        $('#smartMeetingModal').classList.add('open');
+        smRecording = false;
+    }
+
+    function closeSmartMeeting() {
+        stopSmartRecording();
+        $('#smartMeetingModal').classList.remove('open');
+    }
+
+    function stopSmartRecording() {
+        if (smRecorder && smRecorder.state === 'recording') smRecorder.stop();
+        if (smRecognition) { try { smRecognition.stop(); } catch {} smRecognition = null; }
+        clearInterval(smTimerInterval);
+        smRecording = false;
+    }
+
+    async function generateSmartNote() {
+        $('#smRecordPhase').style.display = 'none';
+        $('#smGeneratingPhase').style.display = '';
+        $('#smStopBtn').style.display = 'none';
+        $('#smCancelBtn').style.display = 'none';
+
+        try {
+            const fd = new FormData();
+            fd.append('liveTranscript', smTranscript);
+            // Attach audio blob if captured
+            if (smAudioChunks.length > 0 && smRecorder) {
+                const blob = new Blob(smAudioChunks, { type: smRecorder.mimeType || 'audio/webm' });
+                const ext = blob.type.includes('ogg') ? '.ogg' : blob.type.includes('mp4') ? '.m4a' : '.webm';
+                fd.append('audio', blob, 'meeting' + ext);
+            }
+            const res = await fetch('/api/notes/smart-meeting', {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': TOKEN },
+                body: fd
+            });
+            if (!res.ok) {
+                const e = await res.json().catch(() => ({}));
+                throw new Error(e.error || 'Generation failed');
+            }
+            const data = await res.json();
+            // Show preview
+            $('#smGeneratingPhase').style.display = 'none';
+            $('#smPreviewPhase').style.display = '';
+            $('#smNotesPreview').value = data.note.content || '';
+            if (data.transcript) {
+                $('#smTranscriptFull').textContent = data.transcript;
+            }
+            $('#smSaveBtn').style.display = '';
+            $('#smCancelBtn').style.display = '';
+            // Store note id for potential re-save
+            $('#smSaveBtn').dataset.noteId = data.note.id;
+            $('#smSaveBtn').dataset.noteJson = JSON.stringify(data.note);
+        } catch (err) {
+            $('#smGeneratingPhase').style.display = 'none';
+            $('#smRecordPhase').style.display = '';
+            $('#smCancelBtn').style.display = '';
+            toast('Smart Note: ' + err.message);
+        }
+    }
+
+    $('#smartMeetingBtn').addEventListener('click', e => { e.stopPropagation(); openSmartMeeting(); });
+    $('#smartMeetingClose').addEventListener('click', closeSmartMeeting);
+    $('#smCancelBtn').addEventListener('click', closeSmartMeeting);
+    $('#smartMeetingModal').addEventListener('click', e => { if (e.target === $('#smartMeetingModal')) closeSmartMeeting(); });
+
+    $('#smShowTranscript').addEventListener('click', function () {
+        const box = $('#smTranscriptFull');
+        const visible = box.style.display !== 'none';
+        box.style.display = visible ? 'none' : '';
+        this.innerHTML = visible
+            ? '<i class="bi bi-chevron-down"></i> Show full transcript'
+            : '<i class="bi bi-chevron-up"></i> Hide transcript';
+    });
+
+    $('#smStopBtn').addEventListener('click', () => {
+        stopSmartRecording();
+        // onstop callback will fire generateSmartNote
+    });
+
+    $('#smRecordBtn').addEventListener('click', async () => {
+        if (smRecording) {
+            stopSmartRecording();
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            smAudioChunks = []; smTranscript = ''; smFinalTranscript = ''; smSeconds = 0;
+
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+                : MediaRecorder.isTypeSupported('audio/ogg') ? 'audio/ogg'
+                : '';
+            smRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+            smRecorder.ondataavailable = e => { if (e.data.size > 0) smAudioChunks.push(e.data); };
+            smRecorder.onstop = () => {
+                stream.getTracks().forEach(t => t.stop());
+                generateSmartNote();
+            };
+            smRecorder.start(500);
+            smRecording = true;
+
+            $('#smRecordBtn').classList.add('recording');
+            $('#smRecordBtn').innerHTML = '<i class="bi bi-stop-fill"></i>';
+            $('#smStopBtn').style.display = '';
+            $('#smTimer').style.display = '';
+            $('#smWaveWrap').style.display = '';
+            $('#smHint').style.display = 'none';
+            $('#smTranscriptBox').style.display = '';
+            $('#smStatus').textContent = 'Recording… say "end meeting" or press End Meeting to stop.';
+
+            smTimerInterval = setInterval(() => {
+                smSeconds++;
+                $('#smTimer').textContent = `${Math.floor(smSeconds / 60)}:${String(smSeconds % 60).padStart(2, '0')}`;
+                if (smSeconds >= 3600) stopSmartRecording(); // 1 hour max
+            }, 1000);
+
+            // Web Speech API for live transcription (free)
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                smRecognition = new SR();
+                smRecognition.continuous = true;
+                smRecognition.interimResults = true;
+                smRecognition.lang = navigator.language || 'en-US';
+
+                smRecognition.onresult = ev => {
+                    let interim = '';
+                    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+                        if (ev.results[i].isFinal) smFinalTranscript += ev.results[i][0].transcript + ' ';
+                        else interim += ev.results[i][0].transcript;
+                    }
+                    smTranscript = (smFinalTranscript + interim).trim();
+                    const box = $('#smTranscriptText');
+                    box.textContent = smTranscript;
+                    box.scrollTop = box.scrollHeight;
+
+                    // Auto-detect "end meeting"
+                    const lower = smTranscript.toLowerCase();
+                    if (lower.includes('end meeting') || lower.includes('end the meeting') || lower.includes('stop meeting')) {
+                        // Remove the trigger phrase from transcript
+                        smFinalTranscript = smFinalTranscript.replace(/end (the )?meeting\.?/gi, '').trim();
+                        smTranscript = smFinalTranscript;
+                        stopSmartRecording();
+                    }
+                };
+                smRecognition.onerror = () => {};
+                smRecognition.onend = () => {
+                    // Restart if still recording (Web Speech API auto-stops after silence)
+                    if (smRecording && smRecognition) {
+                        try { smRecognition.start(); } catch {}
+                    }
+                };
+                try { smRecognition.start(); } catch {}
+            }
+        } catch (err) {
+            toast('Microphone access denied. Please allow microphone in browser settings.');
+        }
+    });
+
+    $('#smSaveBtn').addEventListener('click', async () => {
+        const btn = $('#smSaveBtn');
+        const noteId = btn.dataset.noteId;
+        const editedContent = $('#smNotesPreview').value.trim();
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+        try {
+            // Update note content if user edited the preview
+            const noteData = JSON.parse(btn.dataset.noteJson || '{}');
+            if (editedContent !== noteData.content) {
+                await api('PUT', `/api/notes/${noteId}`, {
+                    title: noteData.title,
+                    content: editedContent,
+                    colorHex: noteData.colorHex || '#ffffff',
+                    labels: noteData.labels || null
+                });
+                noteData.content = editedContent;
+            }
+            noteData.content = editedContent;
+            addNoteToDom(noteData, true);
+            $('#notesEmpty').style.display = 'none';
+            closeSmartMeeting();
+            toast('Meeting notes saved ✓');
+            if (currentTab !== 'notes') activateTab('notes');
+        } catch (e) {
+            toast(e.message);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Save Note';
+        }
+    });
+
+    const fabSmart = $('#fabSmart');
+    if (fabSmart) {
+        fabSmart.addEventListener('click', e => {
+            e.stopPropagation();
+            toggleFab(false);
+            openSmartMeeting();
+        });
+    }
 
     // ---------- Search ----------
     $('#noteSearch').addEventListener('input', e => {

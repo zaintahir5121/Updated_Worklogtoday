@@ -17,4 +17,6 @@ public interface IAiService
     Task<AiResponse> GenerateRetroAsync(IReadOnlyList<WorkEntry> entries, CancellationToken ct = default);
     Task<AiResponse> GenerateProductivityInsightAsync(IReadOnlyList<WorkEntry> entries, CancellationToken ct = default);
     Task<AiResponse> GenerateStatusUpdateAsync(IReadOnlyList<WorkEntry> entries, string format, CancellationToken ct = default);
+    Task<string> TranscribeAudioAsync(byte[] audioData, string fileName, CancellationToken ct = default);
+    Task<AiResponse> GenerateMeetingNotesAsync(string transcript, CancellationToken ct = default);
 }

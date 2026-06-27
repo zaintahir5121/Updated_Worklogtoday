@@ -149,6 +149,62 @@ public class NotesApiController : ControllerBase
         return Ok(new { labels = result.Text, source = result.Source });
     }
 
+    [HttpPost("smart-meeting")]
+    [RequestSizeLimit(50_000_000)]
+    public async Task<IActionResult> SmartMeeting(IFormFile? audio, [FromForm] string? liveTranscript, CancellationToken ct)
+    {
+        // Primary transcript path: Web Speech API (free, instant, already in browser)
+        // Enhanced path: Whisper API (if OpenAI key configured + audio uploaded)
+        string? audioUrl = null;
+
+        if (audio != null && audio.Length > 0)
+        {
+            using var ms = new MemoryStream();
+            await audio.CopyToAsync(ms, ct);
+            var audioBytes = ms.ToArray();
+
+            var mimeType = audio.ContentType.Split(';')[0].Trim().ToLowerInvariant();
+            var ext = mimeType.Contains("webm") ? ".webm"
+                    : mimeType.Contains("ogg")  ? ".ogg"
+                    : mimeType.Contains("mp4")  ? ".m4a"
+                    : mimeType.Contains("wav")  ? ".wav"
+                    : ".webm";
+            var fileName = $"meeting_{Uid}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}";
+            var dir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "voice");
+            Directory.CreateDirectory(dir);
+            await System.IO.File.WriteAllBytesAsync(Path.Combine(dir, fileName), audioBytes, ct);
+            audioUrl = $"/uploads/voice/{fileName}";
+
+            // Only call Whisper if we don't already have a good transcript
+            if (string.IsNullOrWhiteSpace(liveTranscript))
+            {
+                var whisper = await _ai.TranscribeAudioAsync(audioBytes, fileName, ct);
+                if (!string.IsNullOrWhiteSpace(whisper)) liveTranscript = whisper;
+            }
+        }
+
+        var transcript = liveTranscript?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(transcript) && audioUrl == null)
+            return BadRequest(new { error = "No audio or transcript provided." });
+
+        // Generate structured meeting notes with Ollama (free, local) or OpenAI fallback
+        var notesResult = await _ai.GenerateMeetingNotesAsync(transcript, ct);
+
+        var note = new Note
+        {
+            UserId    = Uid,
+            Title     = $"Meeting Notes — {DateTime.UtcNow:dd MMM yyyy, HH:mm}",
+            Content   = notesResult.Text,
+            AudioUrl  = audioUrl,
+            Transcript = transcript,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        _db.Notes.Add(note);
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { note = Shape(note), transcript, source = notesResult.Source });
+    }
+
     [HttpPost("voice")]
     [RequestSizeLimit(25_000_000)]
     public async Task<IActionResult> UploadVoice(IFormFile audio, string? transcript, CancellationToken ct)

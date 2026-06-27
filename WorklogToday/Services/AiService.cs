@@ -12,6 +12,7 @@ public class AiService : IAiService
     private readonly string _baseUrl;
     private readonly string _model;
     private readonly int _timeoutSeconds;
+    private readonly string? _openAiKey;
 
     private static readonly string[] CategoryNames =
         ["Development", "Meeting", "Support", "Review", "Planning", "Research", "Documentation", "Other"];
@@ -24,6 +25,7 @@ public class AiService : IAiService
         _baseUrl = (config["Ai:OllamaBaseUrl"] ?? "http://localhost:11434").TrimEnd('/');
         _model = config["Ai:OllamaModel"] ?? "llama3.2";
         _timeoutSeconds = int.TryParse(config["Ai:TimeoutSeconds"], out var t) ? t : 6;
+        _openAiKey = config["OpenAI:ApiKey"];
     }
 
     // ── Summarize work week ──────────────────────────────────────────────────
@@ -263,6 +265,127 @@ public class AiService : IAiService
 
         var ai = await TryAiAsync(sb.ToString(), ct);
         return new AiResponse(ai ?? local, "ai");
+    }
+
+    // ── Whisper transcription ────────────────────────────────────────────────
+
+    public async Task<string> TranscribeAudioAsync(byte[] audioData, string fileName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(_openAiKey) || audioData.Length == 0) return string.Empty;
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new ByteArrayContent(audioData), "file", fileName);
+            content.Add(new StringContent("whisper-1"), "model");
+            using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/audio/transcriptions")
+            {
+                Content = content
+            };
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _openAiKey);
+            using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts2.CancelAfter(TimeSpan.FromSeconds(60));
+            using var resp = await _http.SendAsync(req, cts2.Token);
+            if (!resp.IsSuccessStatusCode) return string.Empty;
+            var json = await resp.Content.ReadAsStringAsync(cts2.Token);
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("text", out var txt) ? txt.GetString()?.Trim() ?? "" : "";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("Whisper transcription failed: {Message}", ex.Message);
+            return string.Empty;
+        }
+    }
+
+    // ── Meeting notes generation ─────────────────────────────────────────────
+
+    public async Task<AiResponse> GenerateMeetingNotesAsync(string transcript, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(transcript))
+            return new AiResponse("No transcript available — please try again.", "local");
+
+        var prompt = BuildMeetingNotesPrompt(transcript);
+
+        // Try OpenAI GPT first
+        if (!string.IsNullOrWhiteSpace(_openAiKey))
+        {
+            var gptResult = await TryOpenAiChatAsync(prompt, ct);
+            if (gptResult != null) return new AiResponse(gptResult, "ai");
+        }
+
+        // Fallback to Ollama
+        var ollamaResult = await TryAiAsync(prompt, ct);
+        if (ollamaResult != null) return new AiResponse(ollamaResult, "ai");
+
+        return new AiResponse(LocalMeetingNotes(transcript), "local");
+    }
+
+    private async Task<string?> TryOpenAiChatAsync(string prompt, CancellationToken ct)
+    {
+        try
+        {
+            var payload = JsonSerializer.Serialize(new
+            {
+                model = "gpt-4o-mini",
+                messages = new[] { new { role = "user", content = prompt } },
+                max_tokens = 900,
+                temperature = 0.3
+            });
+            using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _openAiKey!);
+            using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts2.CancelAfter(TimeSpan.FromSeconds(30));
+            using var resp = await _http.SendAsync(req, cts2.Token);
+            if (!resp.IsSuccessStatusCode) return null;
+            var json = await resp.Content.ReadAsStringAsync(cts2.Token);
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement
+                .GetProperty("choices")[0]
+                .GetProperty("message")
+                .GetProperty("content")
+                .GetString()?.Trim();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("OpenAI chat failed: {Message}", ex.Message);
+            return null;
+        }
+    }
+
+    private static string BuildMeetingNotesPrompt(string transcript) =>
+        "Generate structured meeting notes from this transcript. Use exactly this format:\n\n" +
+        "## Meeting Summary\n(2-3 sentence overview of what was discussed)\n\n" +
+        "## Key Decisions\n• Decision 1\n• Decision 2\n\n" +
+        "## Action Items\n• [Owner if mentioned] Action description\n\n" +
+        "## Next Steps\n• Next step 1\n\n" +
+        "Be specific and concise. Only include what is explicitly in the transcript. " +
+        "If a section has nothing, write '• None identified'.\n\n" +
+        $"Transcript:\n{transcript}";
+
+    private static string LocalMeetingNotes(string transcript)
+    {
+        var lines = transcript.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var preview = transcript.Length > 300 ? transcript[..300] + "…" : transcript;
+        var sb = new StringBuilder();
+        sb.AppendLine("## Meeting Summary");
+        sb.AppendLine(preview);
+        sb.AppendLine();
+        sb.AppendLine("## Key Decisions");
+        sb.AppendLine("• Review the full transcript below for decisions.");
+        sb.AppendLine();
+        sb.AppendLine("## Action Items");
+        sb.AppendLine("• Review the full transcript below for action items.");
+        sb.AppendLine();
+        sb.AppendLine("## Next Steps");
+        sb.AppendLine("• Follow up with meeting participants.");
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine("## Full Transcript");
+        sb.AppendLine(transcript);
+        return sb.ToString().Trim();
     }
 
     // ── Internal AI engine ───────────────────────────────────────────────────
