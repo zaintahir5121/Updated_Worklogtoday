@@ -92,20 +92,46 @@
 
     <!-- TASKS -->
     <section class="tab-pane" id="pane-tasks">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px">
+        <!-- Quick Log Bar -->
+        <div class="quick-log-bar">
+            <div class="ql-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+            <input id="quickLogInput" class="ql-input" placeholder='Quick log — e.g. "2h meeting with Acme re: Q3" or "reviewed PR for 45min"' autocomplete="off" />
+            <button class="btn btn-amber btn-sm" id="quickLogBtn" type="button"><i class="bi bi-send-fill"></i> <span class="btn-label">Log</span></button>
+        </div>
+        <div id="qlPreview" class="ql-preview" style="display:none">
+            <div class="ql-preview-row">
+                <span class="ql-chip" id="qlTask"></span>
+                <span class="ql-chip ql-cat" id="qlCat"></span>
+                <span class="ql-chip" id="qlHours"></span>
+                <span class="ql-chip" id="qlProj" style="display:none"></span>
+            </div>
+            <div class="ql-preview-actions">
+                <button class="btn btn-ghost btn-sm" id="qlEdit" type="button"><i class="bi bi-pencil"></i> Edit</button>
+                <button class="btn btn-amber btn-sm" id="qlConfirm" type="button"><i class="bi bi-check-lg"></i> Confirm & Save</button>
+            </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;margin-top:18px">
             <div class="weeknav">
                 <a class="icon-btn" href="@Url.Action("Index", new { week = Model.WeekOffset - 1 })"><i class="bi bi-chevron-left"></i></a>
                 <strong>@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM yyyy")</strong>
                 <a class="icon-btn" href="@Url.Action("Index", new { week = Model.WeekOffset + 1 })"><i class="bi bi-chevron-right"></i></a>
                 @if (Model.WeekOffset != 0) { <a class="btn btn-ghost btn-sm" href="@Url.Action("Index")">This week</a> }
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
                 <button class="btn btn-ghost btn-sm" id="standupBtn" type="button"><i class="bi bi-megaphone"></i> <span class="btn-label">Standup</span></button>
                 <button class="btn btn-ghost btn-sm" id="retroBtn" type="button"><i class="bi bi-arrow-repeat"></i> <span class="btn-label">Retro</span></button>
                 <button class="btn btn-ghost btn-sm" id="productivityBtn" type="button"><i class="bi bi-graph-up-arrow"></i> <span class="btn-label">Insights</span></button>
+                <div style="width:1px;height:20px;background:var(--line)"></div>
+                <button class="btn btn-ghost btn-sm" id="importCsvBtn" type="button" title="Import CSV"><i class="bi bi-upload"></i> <span class="btn-label">Import</span></button>
+                <button class="btn btn-ghost btn-sm" id="exportCsvBtn" type="button" title="Export CSV"><i class="bi bi-download"></i> <span class="btn-label">Export</span></button>
+                <button class="btn btn-ghost btn-sm" id="printTimesheetBtn" type="button" title="Print / Save PDF"><i class="bi bi-printer"></i> <span class="btn-label">Print</span></button>
                 <button class="btn btn-amber btn-sm" id="addTaskBtn" type="button"><i class="bi bi-plus-lg"></i> <span class="btn-label">Log task</span></button>
             </div>
         </div>
+        <!-- Hidden file input for CSV import -->
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none" />
+
         <div class="card">
             <div class="bd table-wrap">
                 <table class="t" id="taskTable">
@@ -129,7 +155,7 @@
                     </tbody>
                 </table>
                 <div class="empty" id="tasksEmpty" style="@(Model.WeekEntries.Any() ? "display:none" : "")">
-                    <i class="bi bi-clipboard-check"></i><p>No tasks logged this week. Click "Log task".</p>
+                    <i class="bi bi-clipboard-check"></i><p>No tasks yet — use Quick Log above or click "Log task".</p>
                 </div>
             </div>
         </div>

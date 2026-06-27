@@ -897,6 +897,214 @@
         });
     });
 
+    // ---------- Quick Log ----------
+    // Parses natural language like "2h meeting with Acme re: Q3" into task fields
+    const QL_CATS = { development:0,dev:0,coding:0,code:0,build:0,deploy:0,fix:0,bug:0,implement:0,refactor:0,test:0,testing:0, meeting:1,meet:1,standup:1,call:1,sync:1,discussion:1,discuss:1, support:2,ticket:2,customer:2,help:2,issue:2, review:3,pr:3,'code review':3,feedback:3, planning:4,plan:4,sprint:4,roadmap:4,estimate:4,backlog:4, research:5,spike:5,investigate:5,explore:5, documentation:6,docs:6,doc:6,write:6,readme:6,spec:6, other:7 };
+
+    function parseQuickLog(text) {
+        text = text.trim();
+        if (!text) return null;
+        let hours = 1, project = null, task = text;
+
+        // Extract hours: "2h", "1.5h", "45min", "30m", "2 hours"
+        const hrMatch = text.match(/(\d+(?:\.\d+)?)\s*h(?:ours?)?/i);
+        const minMatch = text.match(/(\d+)\s*m(?:in(?:utes?)?)?(?:\b|$)/i);
+        if (hrMatch) { hours = parseFloat(hrMatch[1]); task = task.replace(hrMatch[0], '').trim(); }
+        else if (minMatch) { hours = Math.round(parseFloat(minMatch[1]) / 15) * 0.25 || 0.25; task = task.replace(minMatch[0], '').trim(); }
+
+        // Extract project after "for", "on", "re:", "with" — heuristic
+        const projMatch = task.match(/\b(?:for|with|re:?)\s+([A-Z][A-Za-z0-9 &'-]{1,30}?)(?:\s+(?:re|about|regarding|on|for)\b|$)/);
+        if (projMatch) project = projMatch[1].trim();
+
+        // Clean leading/trailing punctuation
+        task = task.replace(/^[-–—:,]+\s*/, '').replace(/\s*[-–—:,]+$/, '').trim();
+        if (!task) task = text.trim();
+
+        // Infer category from keywords
+        const lower = task.toLowerCase();
+        let category = 7;
+        for (const [kw, cat] of Object.entries(QL_CATS)) {
+            if (lower.includes(kw)) { category = cat; break; }
+        }
+
+        return { task, hours: Math.max(0.25, Math.min(24, hours)), category, project, date: RANGE.today };
+    }
+
+    let qlParsed = null;
+
+    function showQlPreview(parsed) {
+        qlParsed = parsed;
+        $('#qlTask').textContent = parsed.task;
+        $('#qlCat').textContent = CAT[parsed.category];
+        $('#qlHours').textContent = parsed.hours + 'h';
+        if (parsed.project) { $('#qlProj').textContent = parsed.project; $('#qlProj').style.display = ''; }
+        else $('#qlProj').style.display = 'none';
+        $('#qlPreview').style.display = '';
+    }
+
+    async function submitQuickLog(parsed) {
+        const btn = $('#qlConfirm');
+        btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+        try {
+            const w = await api('POST', '/api/work', {
+                task: parsed.task, project: parsed.project || null,
+                category: parsed.category, status: 2,
+                hours: parsed.hours, date: parsed.date,
+                billable: true, notes: null
+            });
+            if (inRange(w.date)) { const tr = document.createElement('tr'); setRowData(tr, w); $('#taskBody').prepend(tr); }
+            $('#quickLogInput').value = '';
+            $('#qlPreview').style.display = 'none';
+            qlParsed = null;
+            taskEmptyCheck(); toast('⚡ Task logged!');
+        } catch (e) { toast(e.message); }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg"></i> Confirm & Save'; }
+    }
+
+    $('#quickLogBtn').addEventListener('click', () => {
+        const val = $('#quickLogInput').value.trim();
+        if (!val) return;
+        const parsed = parseQuickLog(val);
+        if (parsed) showQlPreview(parsed);
+    });
+    $('#quickLogInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = $('#quickLogInput').value.trim();
+            if (!val) return;
+            if (qlParsed) { submitQuickLog(qlParsed); return; }
+            const parsed = parseQuickLog(val);
+            if (parsed) showQlPreview(parsed);
+        }
+        if (e.key === 'Escape') { $('#qlPreview').style.display = 'none'; qlParsed = null; }
+    });
+    $('#qlConfirm').addEventListener('click', () => { if (qlParsed) submitQuickLog(qlParsed); });
+    $('#qlEdit').addEventListener('click', () => {
+        if (!qlParsed) return;
+        openTaskModal(null);
+        $('#tTask').value = qlParsed.task;
+        $('#tHours').value = qlParsed.hours;
+        $('#tCategory').value = qlParsed.category;
+        if (qlParsed.project) $('#tProject').value = qlParsed.project;
+        $('#qlPreview').style.display = 'none';
+        qlParsed = null;
+    });
+
+    // ---------- Export CSV ----------
+    $('#exportCsvBtn').addEventListener('click', () => {
+        const rows = $$('#taskBody tr[data-id]');
+        if (!rows.length) return toast('No tasks to export');
+        const headers = ['Date','Task','Project','Category','Status','Hours','Billable'];
+        const lines = [headers.join(',')];
+        rows.forEach(r => {
+            lines.push([
+                r.dataset.date,
+                `"${(r.dataset.task || '').replace(/"/g,'""')}"`,
+                `"${(r.dataset.project || '').replace(/"/g,'""')}"`,
+                CAT[+r.dataset.category] || '',
+                STAT[+r.dataset.status] || '',
+                r.dataset.hours,
+                r.dataset.billable === 'true' ? 'Yes' : 'No'
+            ].join(','));
+        });
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `timesheet-${RANGE.from}-to-${RANGE.to}.csv`;
+        a.click(); URL.revokeObjectURL(a.href);
+        toast('CSV exported');
+    });
+
+    // ---------- Import CSV ----------
+    $('#importCsvBtn').addEventListener('click', () => $('#csvFileInput').click());
+    $('#csvFileInput').addEventListener('change', async e => {
+        const file = e.target.files[0]; if (!file) return;
+        e.target.value = '';
+        const text = await file.text();
+        const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length < 2) return toast('CSV is empty or has no data rows');
+        // Parse header to find column indexes
+        const header = lines[0].split(',').map(h => h.replace(/"/g,'').trim().toLowerCase());
+        const idx = k => header.findIndex(h => h.includes(k));
+        const iDate = idx('date'), iTask = idx('task'), iProj = idx('proj'),
+              iCat = idx('cat'), iStat = idx('stat'), iHours = idx('hour'), iBill = idx('bill');
+        if (iTask < 0 || iDate < 0) return toast('CSV must have Date and Task columns');
+
+        let saved = 0, failed = 0;
+        for (let i = 1; i < lines.length; i++) {
+            // Handle quoted fields
+            const cols = lines[i].match(/(".*?"|[^,]+|(?<=,)(?=,)|^(?=,))/g) || [];
+            const col = j => j < 0 ? '' : (cols[j] || '').replace(/^"|"$/g,'').trim();
+            const catName = col(iCat).toLowerCase();
+            const catIdx = Object.entries(QL_CATS).find(([k]) => catName.includes(k));
+            const statName = col(iStat).toLowerCase();
+            const statIdx = STAT.findIndex(s => s.toLowerCase() === statName);
+            try {
+                const w = await api('POST', '/api/work', {
+                    task: col(iTask) || 'Imported task',
+                    project: col(iProj) || null,
+                    category: catIdx ? catIdx[1] : 0,
+                    status: statIdx >= 0 ? statIdx : 2,
+                    hours: parseFloat(col(iHours)) || 1,
+                    date: col(iDate) || RANGE.today,
+                    billable: col(iBill).toLowerCase() !== 'no',
+                    notes: null
+                });
+                if (inRange(w.date)) { const tr = document.createElement('tr'); setRowData(tr, w); $('#taskBody').append(tr); }
+                saved++;
+            } catch { failed++; }
+        }
+        taskEmptyCheck();
+        toast(`Imported ${saved} task${saved !== 1 ? 's' : ''}${failed ? ` (${failed} failed)` : ''}`);
+    });
+
+    // ---------- Print Timesheet ----------
+    $('#printTimesheetBtn').addEventListener('click', () => {
+        const rows = $$('#taskBody tr[data-id]');
+        const weekLabel = document.querySelector('.weeknav strong')?.textContent || '';
+        const totalHours = rows.reduce((s, r) => s + (+r.dataset.hours || 0), 0);
+        const billHours = rows.filter(r => r.dataset.billable === 'true').reduce((s, r) => s + (+r.dataset.hours || 0), 0);
+
+        const tableRows = rows.map(r => `
+            <tr>
+                <td>${r.dataset.date}</td>
+                <td>${esc(r.dataset.task)}</td>
+                <td>${esc(r.dataset.project) || '—'}</td>
+                <td>${CAT[+r.dataset.category] || ''}</td>
+                <td>${STAT[+r.dataset.status] || ''}</td>
+                <td style="text-align:right">${r.dataset.hours}h</td>
+                <td style="text-align:center">${r.dataset.billable === 'true' ? '✓' : ''}</td>
+            </tr>`).join('');
+
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+        <title>Timesheet — ${weekLabel}</title>
+        <style>
+            body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:32px;color:#1a1a1a}
+            h1{font-size:22px;margin:0 0 4px}
+            .sub{color:#64748b;font-size:13px;margin-bottom:24px}
+            table{width:100%;border-collapse:collapse;font-size:13px}
+            th{text-align:left;padding:8px 10px;background:#f8f9fa;border-bottom:2px solid #e2e8f0;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+            td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
+            tr:last-child td{border-bottom:none}
+            .totals{margin-top:20px;text-align:right;font-size:13px;color:#64748b}
+            .totals strong{color:#1a1a1a;font-size:15px}
+            @media print{body{margin:16px}}
+        </style></head><body>
+        <h1>Timesheet</h1>
+        <div class="sub">${weekLabel} &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString()}</div>
+        <table>
+            <thead><tr><th>Date</th><th>Task</th><th>Project</th><th>Category</th><th>Status</th><th style="text-align:right">Hours</th><th style="text-align:center">Billable</th></tr></thead>
+            <tbody>${tableRows}</tbody>
+        </table>
+        <div class="totals">Total: <strong>${totalHours.toFixed(1)}h</strong> &nbsp;·&nbsp; Billable: <strong>${billHours.toFixed(1)}h</strong></div>
+        <script>window.onload=()=>window.print()<\/script>
+        </body></html>`;
+
+        const w = window.open('', '_blank');
+        w.document.write(html);
+        w.document.close();
+    });
+
     // ---------- Tasks ----------
     const taskModal = $('#taskModal');
     function openTaskModal(row) {
