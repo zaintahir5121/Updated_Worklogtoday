@@ -13,6 +13,11 @@ public class AiService : IAiService
     private readonly string _model;
     private readonly int _timeoutSeconds;
     private readonly string? _openAiKey;
+    private readonly string? _groqKey;
+    private const string GroqChatUrl = "https://api.groq.com/openai/v1/chat/completions";
+    private const string GroqWhisperUrl = "https://api.groq.com/openai/v1/audio/transcriptions";
+    private const string GroqFastModel = "llama-3.1-8b-instant";
+    private const string GroqWhisperModel = "whisper-large-v3";
 
     private static readonly string[] CategoryNames =
         ["Development", "Meeting", "Support", "Review", "Planning", "Research", "Documentation", "Other"];
@@ -26,6 +31,7 @@ public class AiService : IAiService
         _model = config["Ai:OllamaModel"] ?? "llama3.2";
         _timeoutSeconds = int.TryParse(config["Ai:TimeoutSeconds"], out var t) ? t : 6;
         _openAiKey = config["OpenAI:ApiKey"];
+        _groqKey = config["Groq:ApiKey"];
     }
 
     // ── Summarize work week ──────────────────────────────────────────────────
@@ -37,7 +43,7 @@ public class AiService : IAiService
             return new AiResponse(local, "ai");
 
         var prompt = BuildSummaryPrompt(entries, periodLabel);
-        var ai = await TryAiAsync(prompt, ct);
+        var ai = await TryCloudThenOllamaAsync(prompt, 500, ct);
         return new AiResponse(ai ?? local, "ai");
     }
 
@@ -51,7 +57,7 @@ public class AiService : IAiService
 
         var prompt = $"Suggest 1-4 short, lowercase topic labels (comma separated, no #) for this note. " +
                      $"Reply with ONLY the labels.\nTitle: {title}\nNote: {content}";
-        var ai = await TryAiAsync(prompt, ct);
+        var ai = await TryCloudThenOllamaAsync(prompt, 60, ct);
         if (ai == null) return new AiResponse(local, "ai");
         var cleaned = string.Join(", ", ai.Replace("\n", ",").Split(',')
             .Select(s => s.Trim().Trim('#', '.', '-').ToLowerInvariant())
@@ -73,7 +79,7 @@ public class AiService : IAiService
                      $"\"category\" (one of: {catList}) and \"hours\" (estimated float like 0.5, 1, 1.5, 2, 3, 4). " +
                      $"Example: {{\"category\":\"Development\",\"hours\":2.0}}\n\nTask: {taskDescription}";
 
-        var ai = await TryAiAsync(prompt, ct);
+        var ai = await TryCloudThenOllamaAsync(prompt, 80, ct);
         if (ai != null)
         {
             try
@@ -113,7 +119,7 @@ public class AiService : IAiService
         if (today.Any()) { sb.AppendLine("Today's entries:"); foreach (var e in today) sb.AppendLine($"- {e.Project ?? "General"}: {e.Task} ({e.Hours}h, {e.Status})"); }
         if (blocked.Any()) { sb.AppendLine("Blocked:"); foreach (var e in blocked) sb.AppendLine($"- {e.Task}"); }
 
-        var ai = await TryAiAsync(sb.ToString(), ct);
+        var ai = await TryCloudThenOllamaAsync(sb.ToString(), 400, ct);
         return new AiResponse(ai ?? local, "ai");
     }
 
@@ -132,7 +138,7 @@ public class AiService : IAiService
                      $"Example: [{{\"task\":\"Fix login redirect bug\",\"category\":\"Development\",\"hours\":1.5}}]\n\n" +
                      $"Note title: {title ?? ""}\nNote content: {content}";
 
-        var ai = await TryAiAsync(prompt, ct);
+        var ai = await TryCloudThenOllamaAsync(prompt, 500, ct);
         if (ai != null)
         {
             try
@@ -181,7 +187,7 @@ public class AiService : IAiService
                      $"Be concise and specific. If the answer is not in the notes, say so clearly.\n\n" +
                      $"Question: {question}\n\nNotes:\n{context}";
 
-        var ai = await TryAiAsync(prompt, ct);
+        var ai = await TryCloudThenOllamaAsync(prompt, 300, ct);
         return new AiResponse(ai ?? local, "ai");
     }
 
@@ -203,7 +209,7 @@ public class AiService : IAiService
         var done = entries.Count(e => e.Status == WorkStatus.Done);
         sb.AppendLine($"\nStats: {entries.Count} entries, {done} done, {blocked} blocked, {entries.Sum(e => e.Hours):0.#}h total.");
 
-        var ai = await TryAiAsync(sb.ToString(), ct);
+        var ai = await TryCloudThenOllamaAsync(sb.ToString(), 500, ct);
         return new AiResponse(ai ?? local, "ai");
     }
 
@@ -233,7 +239,7 @@ public class AiService : IAiService
                      $"Hours by category: {string.Join(", ", byCat)}\n" +
                      $"Meeting hours: {meetings:0.#}h ({(total > 0 ? meetings / total * 100 : 0):0}% of total)";
 
-        var ai = await TryAiAsync(prompt, ct);
+        var ai = await TryCloudThenOllamaAsync(prompt, 400, ct);
         return new AiResponse(ai ?? local, "ai");
     }
 
@@ -263,25 +269,42 @@ public class AiService : IAiService
         }
         sb.AppendLine($"\nTotal: {entries.Sum(e => e.Hours):0.#}h | Blocked: {entries.Count(e => e.Status == WorkStatus.Blocked)}");
 
-        var ai = await TryAiAsync(sb.ToString(), ct);
+        var ai = await TryCloudThenOllamaAsync(sb.ToString(), 400, ct);
         return new AiResponse(ai ?? local, "ai");
     }
 
-    // ── Whisper transcription ────────────────────────────────────────────────
+    // ── Whisper transcription (Groq → OpenAI → skip) ────────────────────────
 
     public async Task<string> TranscribeAudioAsync(byte[] audioData, string fileName, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(_openAiKey) || audioData.Length == 0) return string.Empty;
+        if (audioData.Length == 0) return string.Empty;
+
+        // Groq Whisper (free, fast)
+        if (!string.IsNullOrWhiteSpace(_groqKey))
+        {
+            var result = await WhisperCallAsync(GroqWhisperUrl, _groqKey!, GroqWhisperModel, audioData, fileName, ct);
+            if (!string.IsNullOrEmpty(result)) return result;
+        }
+
+        // OpenAI Whisper (fallback)
+        if (!string.IsNullOrWhiteSpace(_openAiKey))
+        {
+            var result = await WhisperCallAsync("https://api.openai.com/v1/audio/transcriptions", _openAiKey!, "whisper-1", audioData, fileName, ct);
+            if (!string.IsNullOrEmpty(result)) return result;
+        }
+
+        return string.Empty;
+    }
+
+    private async Task<string> WhisperCallAsync(string url, string key, string model, byte[] audioData, string fileName, CancellationToken ct)
+    {
         try
         {
             using var content = new MultipartFormDataContent();
             content.Add(new ByteArrayContent(audioData), "file", fileName);
-            content.Add(new StringContent("whisper-1"), "model");
-            using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/audio/transcriptions")
-            {
-                Content = content
-            };
-            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _openAiKey);
+            content.Add(new StringContent(model), "model");
+            using var req = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts2.CancelAfter(TimeSpan.FromSeconds(60));
             using var resp = await _http.SendAsync(req, cts2.Token);
@@ -292,7 +315,7 @@ public class AiService : IAiService
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Whisper transcription failed: {Message}", ex.Message);
+            _logger.LogDebug("Whisper call to {Url} failed: {Message}", url, ex.Message);
             return string.Empty;
         }
     }
@@ -305,39 +328,50 @@ public class AiService : IAiService
             return new AiResponse("No transcript available — please try again.", "local");
 
         var prompt = BuildMeetingNotesPrompt(transcript);
-
-        // Try OpenAI GPT first
-        if (!string.IsNullOrWhiteSpace(_openAiKey))
-        {
-            var gptResult = await TryOpenAiChatAsync(prompt, ct);
-            if (gptResult != null) return new AiResponse(gptResult, "ai");
-        }
-
-        // Fallback to Ollama
-        var ollamaResult = await TryAiAsync(prompt, ct);
-        if (ollamaResult != null) return new AiResponse(ollamaResult, "ai");
-
-        return new AiResponse(LocalMeetingNotes(transcript), "local");
+        var result = await TryCloudThenOllamaAsync(prompt, 900, ct);
+        return new AiResponse(result ?? LocalMeetingNotes(transcript), result != null ? "ai" : "local");
     }
 
-    private async Task<string?> TryOpenAiChatAsync(string prompt, CancellationToken ct)
+    // ── Unified fast chat: Groq → OpenAI → Ollama ───────────────────────────
+
+    private async Task<string?> TryCloudThenOllamaAsync(string prompt, int maxTokens, CancellationToken ct)
+    {
+        // 1. Groq (fastest — free)
+        if (!string.IsNullOrWhiteSpace(_groqKey))
+        {
+            var r = await OpenAiCompatChatAsync(GroqChatUrl, _groqKey!, GroqFastModel, prompt, maxTokens, ct);
+            if (r != null) return r;
+        }
+
+        // 2. OpenAI GPT-4o-mini
+        if (!string.IsNullOrWhiteSpace(_openAiKey))
+        {
+            var r = await OpenAiCompatChatAsync("https://api.openai.com/v1/chat/completions", _openAiKey!, "gpt-4o-mini", prompt, maxTokens, ct);
+            if (r != null) return r;
+        }
+
+        // 3. Local Ollama
+        return await TryCloudThenOllamaAsync(prompt, 900, ct);
+    }
+
+    private async Task<string?> OpenAiCompatChatAsync(string url, string key, string model, string prompt, int maxTokens, CancellationToken ct)
     {
         try
         {
             var payload = JsonSerializer.Serialize(new
             {
-                model = "gpt-4o-mini",
+                model,
                 messages = new[] { new { role = "user", content = prompt } },
-                max_tokens = 900,
+                max_tokens = maxTokens,
                 temperature = 0.3
             });
-            using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+            using var req = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json")
             };
-            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _openAiKey!);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts2.CancelAfter(TimeSpan.FromSeconds(30));
+            cts2.CancelAfter(TimeSpan.FromSeconds(20));
             using var resp = await _http.SendAsync(req, cts2.Token);
             if (!resp.IsSuccessStatusCode) return null;
             var json = await resp.Content.ReadAsStringAsync(cts2.Token);
@@ -350,7 +384,7 @@ public class AiService : IAiService
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("OpenAI chat failed: {Message}", ex.Message);
+            _logger.LogDebug("Chat call to {Url} failed: {Message}", url, ex.Message);
             return null;
         }
     }
