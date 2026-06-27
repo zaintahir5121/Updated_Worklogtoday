@@ -292,7 +292,7 @@
         const audioBlock = n.audioUrl ? `
           <div class="note-audio-block">
             <span class="note-audio-chip"><i class="bi bi-mic-fill"></i> Voice</span>
-            <audio controls preload="none" src="${esc(n.audioUrl)}"></audio>
+            <audio controls preload="metadata" src="${esc(n.audioUrl)}"></audio>
             ${n.transcript ? `<p class="note-audio-transcript">${esc(n.transcript)}</p>` : ''}
           </div>` : '';
         const bodyText = n.audioUrl && (n.content === '[Voice note]' || n.content === '[Shared voice note]') ? '' : n.content || '';
