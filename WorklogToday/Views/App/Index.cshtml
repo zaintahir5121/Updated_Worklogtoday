@@ -1,0 +1,709 @@
+@model AppViewModel
+@{
+    ViewData["Title"] = "Workspace · worklog.today";
+    Layout = "_Layout";
+    string Cat(WorkCategory c) => "p-" + c.ToString().ToLower();
+    string Stat(WorkStatus s) => "s-" + s.ToString().ToLower();
+    string Initials(string n) => string.IsNullOrWhiteSpace(n) ? "?" :
+        string.Concat(n.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => p[0])).ToUpper();
+    var days = Enumerable.Range(0, 7).Select(i => Model.WeekStart.AddDays(i)).ToList();
+    var maxProj = Model.HoursByProject?.Values.DefaultIfEmpty(0).Max() ?? 0;
+}
+@section Head { <meta name="robots" content="noindex" /> }
+
+@Html.AntiForgeryToken()
+
+<div class="app-top">
+    <div class="inner">
+        <a class="logo" href="/app" style="font-size:19px"><span class="mark" style="width:30px;height:30px;font-size:15px"><i class="bi bi-journal-text"></i></span>worklog<span class="dot">.today</span></a>
+        <div class="app-search">
+            <i class="bi bi-search" style="color:var(--muted)"></i>
+            <input id="noteSearch" placeholder="Search notes…" />
+        </div>
+        <button class="btn btn-ghost btn-sm hide-mobile" id="newStickyBtn" type="button" title="Open a desktop sticky note"><i class="bi bi-window-plus"></i> <span class="btn-label">New sticky</span></button>
+        <button class="btn btn-amber btn-sm" id="installBtn" type="button" style="display:none" title="Install worklog.today"><i class="bi bi-download"></i> <span class="btn-label">Install</span></button>
+        <a class="bmc-btn hide-mobile" href="https://buymeacoffee.com/zaintahir512" target="_blank" rel="noopener" title="Buy me a coffee ☕">
+            <i class="bi bi-cup-hot-fill"></i>
+        </a>
+        <div class="app-user">
+            <span class="avatar" style="background:@Model.User.AvatarColor" title="@Model.User.FullName">@Initials(Model.User.FullName)</span>
+            <div class="user-name-wrap">
+                <div style="font-weight:600;font-size:14px">@Model.User.FullName</div>
+                <div style="font-size:12px;color:var(--muted)">@(Model.User.JobTitle ?? "Member")</div>
+            </div>
+            <button type="button" class="icon-btn" id="settingsBtn" title="Settings" style="margin-left:4px"><i class="bi bi-gear"></i></button>
+            <form asp-controller="Account" asp-action="Logout" method="post" style="margin-left:4px">
+                <button type="submit" class="icon-btn" title="Sign out"><i class="bi bi-box-arrow-right"></i></button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="app-tabs">
+    <button class="app-tab active" data-tab="notes"><i class="bi bi-sticky"></i> <span class="tab-label">Notes</span></button>
+    <button class="app-tab" data-tab="tasks"><i class="bi bi-list-check"></i> <span class="tab-label">Tasks</span></button>
+    <button class="app-tab" data-tab="timesheet"><i class="bi bi-calendar-week"></i> <span class="tab-label">Timesheet</span></button>
+    <button class="app-tab" data-tab="reports"><i class="bi bi-bar-chart"></i> <span class="tab-label">Reports</span></button>
+</div>
+<div class="tab-dots" id="tabDots">
+    <span class="tab-dot active" data-tab="notes"></span>
+    <span class="tab-dot" data-tab="tasks"></span>
+    <span class="tab-dot" data-tab="timesheet"></span>
+    <span class="tab-dot" data-tab="reports"></span>
+</div>
+
+<div class="app-body" data-from="@Model.WeekStart.ToString("yyyy-MM-dd")" data-to="@Model.WeekEnd.ToString("yyyy-MM-dd")" data-today="@DateTime.UtcNow.ToString("yyyy-MM-dd")" data-user-id="@Model.User.Id" data-week-offset="@Model.WeekOffset">
+
+    <!-- NOTES -->
+    <section class="tab-pane active" id="pane-notes">
+        <div class="composer" id="composer">
+            <input class="ctitle" id="cTitle" placeholder="Title" />
+            <textarea class="cbody" id="cBody" placeholder="Take a note…" rows="1"></textarea>
+            <div class="ctools">
+                <div class="swatches" id="swatches">
+                    @foreach (var c in new[] { "#ffffff", "#fff8c5", "#d3f9d8", "#dbeafe", "#fbe4ff", "#ffe8cc", "#ffd6d6" })
+                    {
+                        <span class="sw @(c == "#ffffff" ? "active" : "")" style="background:@c" data-color="@c"></span>
+                    }
+                </div>
+                <button class="btn btn-ghost btn-sm" id="voiceNoteBtn" type="button" title="Record voice note"><i class="bi bi-mic"></i> Voice</button>
+                <button class="btn btn-ghost btn-sm" id="smartMeetingBtn" type="button" title="Record meeting — auto-generates action notes"><i class="bi bi-stars"></i> Smart Note</button>
+                <button class="btn btn-ghost btn-sm" id="aiLabelBtn" type="button" title="Smart AI tag suggestions"><i class="bi bi-magic"></i> AI tags</button>
+                <button class="btn btn-ghost btn-sm" id="askAiBtn" type="button" title="Ask AI about your notes"><i class="bi bi-chat-dots"></i> Ask AI</button>
+                <input id="cLabels" class="input" style="flex:1;min-width:100px;padding:7px 10px" placeholder="labels (comma separated)" />
+            </div>
+        </div>
+
+        <div id="pinnedWrap" style="@(Model.PinnedNotes.Any() ? "" : "display:none")">
+            <div class="notes-section-label"><i class="bi bi-pin-angle-fill"></i> Pinned</div>
+            <div class="masonry" id="pinnedNotes">
+                @foreach (var n in Model.PinnedNotes) { <partial name="_NoteCard" model="n" /> }
+            </div>
+        </div>
+
+        <div class="notes-section-label" id="othersLabel" style="@(Model.PinnedNotes.Any() && Model.OtherNotes.Any() ? "" : "display:none")">Others</div>
+        <div class="masonry" id="otherNotes">
+            @foreach (var n in Model.OtherNotes) { <partial name="_NoteCard" model="n" /> }
+        </div>
+        <div class="empty" id="notesEmpty" style="@((Model.PinnedNotes.Any() || Model.OtherNotes.Any()) ? "display:none" : "")">
+            <i class="bi bi-lightbulb"></i><p>Notes you add appear here. Start typing above!</p>
+        </div>
+    </section>
+
+    <!-- TASKS -->
+    <section class="tab-pane" id="pane-tasks">
+        <!-- Quick Log Bar -->
+        <div class="quick-log-bar">
+            <div class="ql-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+            <input id="quickLogInput" class="ql-input" placeholder='Quick log — e.g. "2h meeting with Acme re: Q3" or "reviewed PR for 45min"' autocomplete="off" />
+            <button class="btn btn-amber btn-sm" id="quickLogBtn" type="button"><i class="bi bi-send-fill"></i> <span class="btn-label">Log</span></button>
+        </div>
+        <div id="qlPreview" class="ql-preview" style="display:none">
+            <div class="ql-preview-row">
+                <span class="ql-chip" id="qlTask"></span>
+                <span class="ql-chip ql-cat" id="qlCat"></span>
+                <span class="ql-chip" id="qlHours"></span>
+                <span class="ql-chip" id="qlProj" style="display:none"></span>
+            </div>
+            <div class="ql-preview-actions">
+                <button class="btn btn-ghost btn-sm" id="qlEdit" type="button"><i class="bi bi-pencil"></i> Edit</button>
+                <button class="btn btn-amber btn-sm" id="qlConfirm" type="button"><i class="bi bi-check-lg"></i> Confirm & Save</button>
+            </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;margin-top:18px">
+            <div class="weeknav">
+                <a class="icon-btn" href="@Url.Action("Index", new { week = Model.WeekOffset - 1 })"><i class="bi bi-chevron-left"></i></a>
+                <strong>@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM yyyy")</strong>
+                <a class="icon-btn" href="@Url.Action("Index", new { week = Model.WeekOffset + 1 })"><i class="bi bi-chevron-right"></i></a>
+                @if (Model.WeekOffset != 0) { <a class="btn btn-ghost btn-sm" href="@Url.Action("Index")">This week</a> }
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <button class="btn btn-ghost btn-sm" id="standupBtn" type="button"><i class="bi bi-megaphone"></i> <span class="btn-label">Standup</span></button>
+                <button class="btn btn-ghost btn-sm" id="retroBtn" type="button"><i class="bi bi-arrow-repeat"></i> <span class="btn-label">Retro</span></button>
+                <button class="btn btn-ghost btn-sm" id="productivityBtn" type="button"><i class="bi bi-graph-up-arrow"></i> <span class="btn-label">Insights</span></button>
+                <div style="width:1px;height:20px;background:var(--line)" class="hide-mobile"></div>
+                <div class="task-toolbar-actions">
+                <button class="btn btn-ghost btn-sm" id="importCsvBtn" type="button" title="Import CSV"><i class="bi bi-upload"></i> <span class="btn-label">Import</span></button>
+                <button class="btn btn-ghost btn-sm" id="exportCsvBtn" type="button" title="Export CSV"><i class="bi bi-download"></i> <span class="btn-label">Export</span></button>
+                <button class="btn btn-ghost btn-sm" id="printTimesheetBtn" type="button" title="Print / Save PDF"><i class="bi bi-printer"></i> <span class="btn-label">Print</span></button>
+                </div>
+                <button class="btn btn-amber btn-sm" id="addTaskBtn" type="button"><i class="bi bi-plus-lg"></i> <span class="btn-label">Log task</span></button>
+            </div>
+        </div>
+        <!-- Hidden file input for CSV import -->
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none" />
+
+        <div class="card">
+            <div class="bd table-wrap">
+                <table class="t" id="taskTable">
+                    <thead><tr><th>Date</th><th>Task</th><th class="hide-mobile">Project</th><th class="hide-mobile">Category</th><th>Status</th><th>Hours</th><th></th></tr></thead>
+                    <tbody id="taskBody">
+                    @foreach (var w in Model.WeekEntries)
+                    {
+                        <tr data-id="@w.Id" data-task="@w.Task" data-project="@w.Project" data-category="@((int)w.Category)" data-status="@((int)w.Status)" data-hours="@w.Hours" data-date="@w.Date.ToString("yyyy-MM-dd")" data-billable="@w.Billable.ToString().ToLower()" data-notes="@w.Notes">
+                            <td>@w.Date.ToString("ddd dd")</td>
+                            <td><strong>@w.Task</strong>@(!w.Billable ? Html.Raw(" <span class='pill p-other' style='font-size:10px'>non-billable</span>") : null)</td>
+                            <td class="hide-mobile">@(w.Project ?? "—")</td>
+                            <td class="hide-mobile"><span class="pill @Cat(w.Category)">@w.Category</span></td>
+                            <td><span class="pill @Stat(w.Status)">@w.Status</span></td>
+                            <td><strong>@w.Hours.ToString("0.#")h</strong></td>
+                            <td style="text-align:right;white-space:nowrap">
+                                <button class="mini-btn editTask" type="button"><i class="bi bi-pencil"></i></button>
+                                <button class="mini-btn delTask" type="button"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+                <div class="empty" id="tasksEmpty" style="@(Model.WeekEntries.Any() ? "display:none" : "")">
+                    <i class="bi bi-clipboard-check"></i><p>No tasks yet — use Quick Log above or click "Log task".</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TIMESHEET -->
+    <section class="tab-pane" id="pane-timesheet">
+        <div class="stat-grid"
+             data-total-hours="@Model.TotalHours.ToString("0.#")"
+             data-billable-hours="@Model.BillableHours.ToString("0.#")"
+             data-task-count="@Model.EntryCount"
+             data-earnings="@(Model.User.HourlyRate > 0 ? "$" + (Model.BillableHours * (double)Model.User.HourlyRate).ToString("N0") : "")"
+             data-week-label="@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM yyyy")">
+            <div class="stat"><div class="v">@Model.TotalHours.ToString("0.#")</div><div class="l">Total hours</div></div>
+            <div class="stat"><div class="v">@Model.BillableHours.ToString("0.#")</div><div class="l">Billable hours</div></div>
+            <div class="stat"><div class="v">@Model.EntryCount</div><div class="l">Tasks logged</div></div>
+            @if (Model.User.HourlyRate > 0)
+            {
+                <div class="stat" style="background:linear-gradient(135deg,#fef3c7,#fde68a)">
+                    <div class="v" style="color:#92400e">$@((Model.BillableHours * (double)Model.User.HourlyRate).ToString("N0"))</div>
+                    <div class="l" style="color:#78350f">Estimated earnings</div>
+                </div>
+            }
+            else
+            {
+                <div class="stat"><div class="v">@Model.NoteCount</div><div class="l">Active notes</div></div>
+            }
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:8px">
+            @if (Model.WeekStreak > 0)
+            {
+                <div style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;border-radius:100px;padding:6px 14px;font-size:13px;font-weight:600">
+                    <i class="bi bi-fire"></i> @Model.WeekStreak-week streak@(Model.WeekStreak == 1 ? "" : "s")
+                </div>
+            }
+            else { <div></div> }
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-ghost btn-sm" id="badgeBtn" type="button" title="Get your referral badge"><i class="bi bi-patch-check"></i> <span class="btn-label">Get badge</span></button>
+                <button class="btn btn-ghost btn-sm" id="shareLinkBtn" type="button" title="Copy public share link for this week"><i class="bi bi-link-45deg"></i> <span class="btn-label">Share link</span></button>
+                <button class="btn btn-ghost btn-sm" id="emailManagerBtn" type="button" title="Email this week's report to your manager"><i class="bi bi-envelope-arrow-up"></i> <span class="btn-label">Email manager</span></button>
+                <button class="btn btn-ghost btn-sm" id="shareCardBtn" type="button" title="Generate a shareable PNG card"><i class="bi bi-share"></i> <span class="btn-label">Share card</span></button>
+            </div>
+        </div>
+
+        <div class="ts-grid" style="display:grid;grid-template-columns:1.4fr 1fr;gap:18px">
+            <div class="card">
+                <div class="hd"><strong>Daily breakdown</strong><span style="color:var(--muted);font-size:13px">@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM")</span></div>
+                <div class="bd" style="padding:16px">
+                    @{ var maxDay = days.Select(d => Model.WeekEntries.Where(e => e.Date == d).Sum(e => e.Hours)).DefaultIfEmpty(0).Max(); }
+                    @foreach (var d in days)
+                    {
+                        var hrs = Model.WeekEntries.Where(e => e.Date == d).Sum(e => e.Hours);
+                        var w = maxDay > 0 ? (int)(hrs / maxDay * 100) : 0;
+                        <div style="display:flex;align-items:center;gap:12px;margin-bottom:11px">
+                            <div style="width:64px;font-size:13px;color:var(--muted)">@d.ToString("ddd dd")</div>
+                            <div class="bar" style="flex:1"><span style="width:@w%"></span></div>
+                            <div style="width:46px;text-align:right;font-weight:600;font-size:13px">@hrs.ToString("0.#")h</div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="card">
+                <div class="hd"><strong>By project</strong></div>
+                <div class="bd" style="padding:16px">
+                    @{ var hbp = Model.HoursByProject ?? new Dictionary<string, double>(); }
+                    @if (!hbp.Any()) { <div class="empty" style="padding:28px"><p>No data yet.</p></div> }
+                    @foreach (var kv in hbp.OrderByDescending(k => k.Value))
+                    {
+                        var w = maxProj > 0 ? (int)(kv.Value / maxProj * 100) : 0;
+                        <div style="margin-bottom:13px">
+                            <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:5px"><span>@kv.Key</span><strong>@kv.Value.ToString("0.#")h</strong></div>
+                            <div class="bar"><span style="width:@w%"></span></div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="ai-panel" style="margin-top:18px">
+            <div class="ai-head">
+                <span class="ai-badge"><i class="bi bi-cpu"></i> Smart AI</span>
+                <strong>Weekly status summary</strong>
+                <button class="btn btn-amber btn-sm" id="genSummaryBtn" type="button" style="margin-left:auto"><i class="bi bi-stars"></i> Generate summary</button>
+                <button class="btn btn-ghost btn-sm" id="statusUpdateBtn" type="button"><i class="bi bi-send"></i> Status update</button>
+            </div>
+            <div style="color:var(--muted);font-size:13.5px">Turn this week's tasks into a ready-to-submit report with one click.</div>
+            <div class="ai-out" id="aiOut"></div>
+            <div class="ai-source" id="aiSource"></div>
+            <div id="aiCopyWrap" style="display:none;margin-top:10px">
+                <button class="btn btn-ghost btn-sm" id="copySummaryBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="tab-pane" id="pane-reports">
+        <div class="ts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+            <div class="card"><div class="hd"><strong>Hours by category</strong></div><div class="bd" style="padding:16px" id="repCategory"><div class="empty" style="padding:28px"><p>Loading…</p></div></div></div>
+            <div class="card"><div class="hd"><strong>Hours by project</strong></div><div class="bd" style="padding:16px" id="repProject"><div class="empty" style="padding:28px"><p>Loading…</p></div></div></div>
+        </div>
+        <div class="card" style="margin-top:18px"><div class="hd"><strong>Daily hours (this week)</strong></div><div class="bd" style="padding:16px" id="repDay"></div></div>
+    </section>
+</div>
+
+<!-- Task modal -->
+<div class="modal-bg" id="taskModal">
+    <div class="modal">
+        <div class="mh"><span id="taskModalTitle">Log a task</span><button class="icon-btn" type="button" data-close>&times;</button></div>
+        <div class="mb">
+            <input type="hidden" id="tId" />
+            <div class="field">
+                <label class="lbl">Task</label>
+                <div style="display:flex;gap:6px">
+                    <input id="tTask" class="input" placeholder="What did you work on?" style="flex:1" />
+                    <button class="btn btn-ghost btn-sm" id="aiSuggestBtn" type="button" title="Smart AI: suggest category &amp; hours"><i class="bi bi-cpu"></i> Suggest</button>
+                </div>
+            </div>
+            <div class="row2">
+                <div class="field"><label class="lbl">Project</label><input id="tProject" class="input" placeholder="Project / client" /></div>
+                <div class="field"><label class="lbl">Date</label><input id="tDate" type="date" class="input" /></div>
+            </div>
+            <div class="row2">
+                <div class="field"><label class="lbl">Category</label><select id="tCategory" class="input">
+                    @foreach (var c in Enum.GetValues<WorkCategory>()) { <option value="@((int)c)">@c</option> }
+                </select></div>
+                <div class="field"><label class="lbl">Status</label><select id="tStatus" class="input">
+                    @foreach (var s in Enum.GetValues<WorkStatus>()) { <option value="@((int)s)">@s</option> }
+                </select></div>
+            </div>
+            <div class="row2">
+                <div class="field"><label class="lbl">Hours</label><input id="tHours" type="number" step="0.25" min="0" max="24" class="input" value="1" /></div>
+                <div class="field" style="display:flex;align-items:flex-end;gap:8px;padding-bottom:4px"><input id="tBillable" type="checkbox" checked style="width:16px;height:16px" /><label class="lbl" style="margin:0">Billable</label></div>
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="saveTaskBtn"><i class="bi bi-check-lg"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Standup modal -->
+<div class="modal-bg" id="standupModal">
+    <div class="modal" style="max-width:560px">
+        <div class="mh">
+            <span><i class="bi bi-cpu" style="color:var(--amber)"></i> Smart AI Daily Standup</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="color:var(--muted);font-size:13px;margin-bottom:14px">Generated from your recent work entries — ready to paste into Slack, Teams, or email.</div>
+            <div id="standupOut" class="ai-out" style="min-height:80px;white-space:pre-wrap"></div>
+            <div id="standupSource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-ghost btn-sm" id="regenStandupBtn" type="button"><i class="bi bi-arrow-repeat"></i> Regenerate</button>
+            <button class="btn btn-amber btn-sm" id="copyStandupBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+    </div>
+</div>
+
+<!-- Retro modal -->
+<div class="modal-bg" id="retroModal">
+    <div class="modal" style="max-width:560px">
+        <div class="mh">
+            <span><i class="bi bi-arrow-repeat" style="color:var(--amber)"></i> Smart AI Weekly Retro</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="color:var(--muted);font-size:13px;margin-bottom:14px">What went well, what didn't, and what to focus on next week — generated from your entries.</div>
+            <div id="retroOut" class="ai-out" style="min-height:80px;white-space:pre-wrap"></div>
+            <div id="retroSource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-ghost btn-sm" id="regenRetroBtn" type="button"><i class="bi bi-arrow-repeat"></i> Regenerate</button>
+            <button class="btn btn-amber btn-sm" id="copyRetroBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+    </div>
+</div>
+
+<!-- Productivity Insights modal -->
+<div class="modal-bg" id="productivityModal">
+    <div class="modal" style="max-width:560px">
+        <div class="mh">
+            <span><i class="bi bi-graph-up-arrow" style="color:var(--amber)"></i> Smart AI Productivity Insights</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="color:var(--muted);font-size:13px;margin-bottom:14px">AI analysis of your work patterns with actionable tips.</div>
+            <div id="productivityOut" class="ai-out" style="min-height:80px;white-space:pre-wrap"></div>
+            <div id="productivitySource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-ghost btn-sm" id="regenProductivityBtn" type="button"><i class="bi bi-arrow-repeat"></i> Refresh</button>
+        </div>
+    </div>
+</div>
+
+<!-- Status Update modal -->
+<div class="modal-bg" id="statusUpdateModal">
+    <div class="modal" style="max-width:600px">
+        <div class="mh">
+            <span><i class="bi bi-send" style="color:var(--amber)"></i> Smart AI Status Update</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="display:flex;gap:8px;margin-bottom:14px">
+                <button class="btn btn-amber btn-sm" id="statusFmtEmail" type="button" data-fmt="email"><i class="bi bi-envelope"></i> Email</button>
+                <button class="btn btn-ghost btn-sm" id="statusFmtSlack" type="button" data-fmt="slack"><i class="bi bi-slack"></i> Slack</button>
+            </div>
+            <div id="statusUpdateOut" class="ai-out" style="min-height:80px;white-space:pre-wrap"></div>
+            <div id="statusUpdateSource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-amber btn-sm" id="copyStatusBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+        </div>
+    </div>
+</div>
+
+<!-- Ask AI modal -->
+<div class="modal-bg" id="askAiModal">
+    <div class="modal" style="max-width:580px">
+        <div class="mh">
+            <span><i class="bi bi-chat-dots" style="color:var(--amber)"></i> Ask AI about your notes</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div class="field">
+                <label class="lbl">Ask a question about your notes</label>
+                <div style="display:flex;gap:8px">
+                    <input id="askAiInput" class="input" placeholder="e.g. What did we decide about auth? What are my current blockers?" style="flex:1" />
+                    <button class="btn btn-amber btn-sm" id="askAiSubmitBtn" type="button"><i class="bi bi-send"></i></button>
+                </div>
+            </div>
+            <div id="askAiOut" class="ai-out" style="min-height:60px;white-space:pre-wrap;margin-top:8px"></div>
+            <div id="askAiSource" class="ai-source"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Extract tasks modal -->
+<div class="modal-bg" id="extractModal">
+    <div class="modal" style="max-width:580px">
+        <div class="mh">
+            <span><i class="bi bi-list-task" style="color:var(--amber)"></i> Smart AI: Tasks from Note</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div style="color:var(--muted);font-size:13px;margin-bottom:14px">AI found these action items. Select the ones you want to add to your task log.</div>
+            <div id="extractList"></div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="addExtractedBtn"><i class="bi bi-plus-lg"></i> Add selected tasks</button>
+        </div>
+    </div>
+</div>
+
+<!-- Share link modal -->
+<div class="modal-bg" id="shareLinkModal">
+    <div class="modal" style="max-width:520px">
+        <div class="mh">
+            <span><i class="bi bi-link-45deg" style="color:var(--amber)"></i> Public share link</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Anyone with this link can view your work log for this week — no login required. Great for portfolios and manager updates.</p>
+            <div class="field">
+                <label class="lbl">Your public link</label>
+                <div style="display:flex;gap:8px">
+                    <input id="shareLinkUrl" class="input" readonly style="flex:1;font-size:13px;color:var(--muted)" />
+                    <button class="btn btn-amber btn-sm" id="copyShareLinkBtn" type="button"><i class="bi bi-clipboard"></i> Copy</button>
+                </div>
+            </div>
+            <div style="margin-top:12px;font-size:12px;color:var(--muted)">
+                <i class="bi bi-eye"></i> Viewers can see tasks, hours and categories — private notes are never included.
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <a class="btn btn-ghost btn-sm" id="openShareLinkBtn" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Preview</a>
+        </div>
+    </div>
+</div>
+
+<!-- Email manager modal -->
+<div class="modal-bg" id="emailManagerModal">
+    <div class="modal" style="max-width:520px">
+        <div class="mh">
+            <span><i class="bi bi-envelope-arrow-up" style="color:var(--amber)"></i> Email weekly report to manager</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Sends a formatted HTML report of this week's work log. A "Sent via worklog.today" footer is included.</p>
+            <div class="field">
+                <label class="lbl">Manager's email <span style="color:#ef4444">*</span></label>
+                <input id="emEmail" class="input" type="email" placeholder="manager@company.com" />
+            </div>
+            <div class="field">
+                <label class="lbl">Personal message (optional)</label>
+                <textarea id="emMessage" class="input" rows="3" placeholder="e.g. Here's my weekly update. Happy to discuss further in our 1:1." style="resize:vertical"></textarea>
+            </div>
+            <div class="field">
+                <label class="lbl">Week</label>
+                <input id="emWeekLabel" class="input" readonly style="color:var(--muted)" value="@Model.WeekStart.ToString("dd MMM") – @Model.WeekEnd.ToString("dd MMM yyyy")" />
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="sendEmailManagerBtn"><i class="bi bi-send"></i> Send report</button>
+        </div>
+    </div>
+</div>
+
+<!-- Badge modal -->
+<div class="modal-bg" id="badgeModal">
+    <div class="modal" style="max-width:520px">
+        <div class="mh">
+            <span><i class="bi bi-patch-check" style="color:var(--amber)"></i> Get your badge</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Add to your GitHub README, email signature, or personal site to show you track your work.</p>
+            <div style="text-align:center;margin:0 0 20px">
+                <img src="/badge.svg" alt="tracked with worklog.today" style="height:24px" />
+            </div>
+            <div class="field">
+                <label class="lbl">HTML (for websites &amp; email signatures)</label>
+                <div style="display:flex;gap:8px">
+                    <input id="badgeHtml" class="input" readonly style="flex:1;font-size:12px;font-family:monospace;color:var(--muted)" />
+                    <button class="btn btn-ghost btn-sm" id="copyBadgeHtmlBtn" type="button"><i class="bi bi-clipboard"></i></button>
+                </div>
+            </div>
+            <div class="field">
+                <label class="lbl">Markdown (for GitHub READMEs)</label>
+                <div style="display:flex;gap:8px">
+                    <input id="badgeMd" class="input" readonly style="flex:1;font-size:12px;font-family:monospace;color:var(--muted)" />
+                    <button class="btn btn-ghost btn-sm" id="copyBadgeMdBtn" type="button"><i class="bi bi-clipboard"></i></button>
+                </div>
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Share card modal -->
+<div class="modal-bg" id="shareCardModal">
+    <div class="modal" style="max-width:660px">
+        <div class="mh">
+            <span><i class="bi bi-share" style="color:var(--amber)"></i> Share my week</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb" style="padding:16px 24px">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Share to LinkedIn, Twitter, or anywhere — download the PNG or copy it to clipboard.</p>
+            <div id="shareCardPreview" style="width:100%;border-radius:10px;overflow:hidden;background:#0f172a;line-height:0">
+                <canvas id="shareCanvas" style="width:100%;height:auto;display:block"></canvas>
+            </div>
+        </div>
+        <div class="mf" style="flex-wrap:wrap;gap:8px">
+            <button class="btn btn-ghost" type="button" data-close>Close</button>
+            <button class="btn btn-ghost btn-sm" id="copyCardTextBtn" type="button"><i class="bi bi-clipboard-fill"></i> Copy text</button>
+            <button class="btn btn-ghost btn-sm" id="copyCardImgBtn" type="button"><i class="bi bi-image"></i> Copy image</button>
+            <button class="btn btn-amber btn-sm" id="downloadCardBtn" type="button"><i class="bi bi-download"></i> Download PNG</button>
+        </div>
+    </div>
+</div>
+
+<!-- Smart Meeting Note modal -->
+<div class="modal-bg" id="smartMeetingModal">
+    <div class="modal" style="max-width:520px">
+        <div class="mh">
+            <span><i class="bi bi-stars" style="color:#7c3aed"></i> Smart Note</span>
+            <button class="icon-btn" type="button" id="smartMeetingClose">&times;</button>
+        </div>
+        <div class="mb" style="padding:24px">
+            <!-- Phase 1: Recording -->
+            <div id="smRecordPhase">
+                <div id="smStatus" class="sm-status-text">Press Start to record your meeting. Say <strong>"end meeting"</strong> to stop automatically.</div>
+                <div class="sm-record-center">
+                    <button class="sm-record-btn" id="smRecordBtn" type="button">
+                        <i class="bi bi-play-fill"></i>
+                    </button>
+                    <div id="smTimer" style="display:none;font-size:26px;font-weight:700;font-family:monospace;color:var(--ink);margin-top:12px">0:00</div>
+                    <div id="smWaveWrap" style="display:none;margin:10px 0">
+                        <div class="voice-wave sm-wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                    </div>
+                </div>
+                <div id="smTranscriptBox" style="display:none;margin-top:14px">
+                    <div class="sm-transcript-label"><i class="bi bi-chat-text"></i> Live transcript</div>
+                    <div id="smTranscriptText" class="sm-transcript-scroll"></div>
+                </div>
+                <div class="sm-hint" id="smHint">Tip: Just speak naturally. Mention names, decisions, and action items.</div>
+            </div>
+            <!-- Phase 2: Generating notes -->
+            <div id="smGeneratingPhase" style="display:none;text-align:center;padding:20px 0">
+                <div class="sm-spinner"></div>
+                <div style="margin-top:16px;font-weight:600;color:var(--ink)">Generating meeting notes…</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:6px">AI is extracting decisions, action items & next steps</div>
+            </div>
+            <!-- Phase 3: Preview generated notes -->
+            <div id="smPreviewPhase" style="display:none">
+                <div class="sm-transcript-label" style="margin-bottom:8px"><i class="bi bi-journal-check"></i> Meeting notes — review before saving</div>
+                <textarea id="smNotesPreview" class="sm-notes-preview" rows="12"></textarea>
+                <div id="smTranscriptCollapse" style="margin-top:10px">
+                    <button class="btn btn-ghost btn-sm" id="smShowTranscript" type="button" style="font-size:12px"><i class="bi bi-chevron-down"></i> Show full transcript</button>
+                    <div id="smTranscriptFull" style="display:none;margin-top:8px;font-size:12px;color:var(--muted);max-height:120px;overflow-y:auto;white-space:pre-wrap;background:var(--soft);padding:10px;border-radius:8px"></div>
+                </div>
+            </div>
+        </div>
+        <div class="mf" style="gap:10px;justify-content:flex-end" id="smFooter">
+            <button class="btn btn-ghost" type="button" id="smCancelBtn">Cancel</button>
+            <button class="btn" id="smStopBtn" type="button" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;display:none"><i class="bi bi-stop-fill"></i> End Meeting</button>
+            <button class="btn btn-amber" id="smSaveBtn" type="button" style="display:none"><i class="bi bi-check-lg"></i> Save Note</button>
+        </div>
+    </div>
+</div>
+
+<!-- Voice note modal -->
+<div class="modal-bg" id="voiceModal">
+    <div class="modal" style="max-width:440px;text-align:center">
+        <div class="mh">
+            <span><i class="bi bi-mic" style="color:#ef4444"></i> Voice Note</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb" style="padding:28px 24px">
+            <div id="voiceStatus" style="color:var(--muted);font-size:13px;margin-bottom:18px">Press the button and start speaking. Your voice will be transcribed automatically.</div>
+            <button class="voice-record-btn" id="voiceRecordBtn" type="button">
+                <i class="bi bi-mic-fill"></i>
+            </button>
+            <div id="voiceTimer" style="font-size:28px;font-weight:700;font-family:monospace;margin:16px 0 8px;display:none">0:00</div>
+            <div id="voiceWaveWrap" style="display:none;margin:8px 0">
+                <div class="voice-wave"><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+            <div id="voiceTranscriptPreview" style="min-height:48px;padding:10px;background:var(--soft);border-radius:10px;font-size:13.5px;color:var(--ink);text-align:left;margin-top:16px;display:none"></div>
+        </div>
+        <div class="mf" style="justify-content:center;gap:10px">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="voiceSaveBtn" disabled><i class="bi bi-check-lg"></i> Save note</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Friday nudge banner -->
+<div class="nudge-banner" id="fridayNudge" style="display:none">
+    <i class="bi bi-stars" style="color:#f59e0b"></i>
+    <span>It's Friday! Generate your <strong>weekly summary</strong> before you log off.</span>
+    <button class="btn btn-amber btn-sm" id="nudgeSummaryBtn" type="button"><i class="bi bi-lightning-fill"></i> Generate now</button>
+    <button class="icon-btn" id="nudgeDismissBtn" type="button" style="margin-left:auto">&times;</button>
+</div>
+
+<!-- End-of-day quick log prompt -->
+<div class="modal-bg" id="eodModal">
+    <div class="modal" style="max-width:480px">
+        <div class="mh">
+            <span><i class="bi bi-sun" style="color:#f59e0b"></i> End of day — quick log</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 16px">What did you work on today? Takes 30 seconds.</p>
+            <div class="field"><label class="lbl">What did you work on?</label><input id="eodTask" class="input" placeholder="e.g. Fixed auth bug, reviewed PRs" /></div>
+            <div class="row2">
+                <div class="field"><label class="lbl">Project</label><input id="eodProject" class="input" placeholder="Project / client" /></div>
+                <div class="field"><label class="lbl">Hours</label><input id="eodHours" type="number" step="0.5" min="0.5" max="16" class="input" value="8" /></div>
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Skip today</button>
+            <button class="btn btn-amber" type="button" id="saveEodBtn"><i class="bi bi-check-lg"></i> Log it</button>
+        </div>
+    </div>
+</div>
+
+<!-- Settings modal -->
+<div class="modal-bg" id="settingsModal">
+    <div class="modal" style="max-width:500px">
+        <div class="mh">
+            <span><i class="bi bi-gear" style="color:var(--amber)"></i> Workspace settings</span>
+            <button class="icon-btn" type="button" data-close>&times;</button>
+        </div>
+        <div class="mb">
+            <div class="field"><label class="lbl">Display name</label><input id="sName" class="input" value="@Model.User.FullName" /></div>
+            <div class="row2">
+                <div class="field"><label class="lbl">Job title</label><input id="sTitle" class="input" value="@(Model.User.JobTitle ?? "")" placeholder="e.g. Freelance Developer" /></div>
+                <div class="field"><label class="lbl">Company</label><input id="sCompany" class="input" value="@(Model.User.Company ?? "")" placeholder="e.g. Acme Corp" /></div>
+            </div>
+            <div class="field">
+                <label class="lbl">Hourly rate (for billing summary)</label>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span style="color:var(--muted);font-size:15px">$</span>
+                    <input id="sRate" type="number" step="1" min="0" class="input" value="@Model.User.HourlyRate" placeholder="0 = disabled" style="max-width:120px" />
+                    <span style="color:var(--muted);font-size:13px">/ hr</span>
+                </div>
+            </div>
+            <div class="field" style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface);border-radius:8px">
+                <input id="sDigest" type="checkbox" style="width:18px;height:18px;accent-color:var(--amber)" @(Model.User.EmailDigestEnabled ? "checked" : "") />
+                <div>
+                    <label class="lbl" style="margin:0;cursor:pointer" for="sDigest">Weekly email digest</label>
+                    <div style="font-size:12px;color:var(--muted)">Get a Monday morning briefing of last week's work to @(Model.User.Email ?? "your email")</div>
+                </div>
+            </div>
+        </div>
+        <div class="mf">
+            <button class="btn btn-ghost" type="button" data-close>Cancel</button>
+            <button class="btn btn-amber" type="button" id="saveSettingsBtn"><i class="bi bi-check-lg"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile bottom navigation (hidden on desktop via CSS) -->
+<nav class="bottom-nav" id="bottomNav">
+    <button class="bottom-nav-item active" data-tab="notes" type="button">
+        <i class="bi bi-lightbulb"></i>
+        Notes
+    </button>
+    <button class="bottom-nav-item" data-tab="tasks" type="button">
+        <i class="bi bi-list-check"></i>
+        Tasks
+    </button>
+    <button class="bottom-nav-item" data-tab="timesheet" type="button">
+        <i class="bi bi-calendar-week"></i>
+        Time
+    </button>
+    <button class="bottom-nav-item" data-tab="reports" type="button">
+        <i class="bi bi-bar-chart"></i>
+        Reports
+    </button>
+</nav>
+
+<!-- Mobile FAB group -->
+<div class="fab-group" id="fabGroup">
+    <button class="fab fab-sub fab-smart" id="fabSmart" type="button" title="Smart meeting note" style="display:none"><i class="bi bi-stars"></i></button>
+    <button class="fab fab-sub" id="fabVoice" type="button" title="Voice note" style="display:none"><i class="bi bi-mic-fill"></i></button>
+    <button class="fab fab-sub" id="fabText" type="button" title="Text note" style="display:none"><i class="bi bi-pencil"></i></button>
+    <button class="fab" id="mobileFab" type="button" title="New note"><i class="bi bi-plus"></i></button>
+</div>
+
+@section Scripts {
+    <script src="~/js/app.js" asp-append-version="true"></script>
+}

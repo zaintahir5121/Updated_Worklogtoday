@@ -1,0 +1,65 @@
+@{
+    ViewData["Title"] = "Get started · worklog.today";
+    ViewData["Description"] = "Create a free worklog.today account with Google.";
+    var googleEnabled = ViewData["GoogleEnabled"] as bool? == true;
+}
+<div class="auth-wrap">
+    <aside class="auth-aside">
+        <a class="logo" href="/" style="color:#fff"><span class="mark"><i class="bi bi-journal-text"></i></span>worklog<span style="color:var(--amber)">.today</span></a>
+        <div>
+            <h2>Start capturing your work in seconds.</h2>
+            <p>Free to start. No credit card. Your notes, tasks and timesheets — all in one calm, fast workspace.</p>
+            <div class="pts">
+                <div><i class="bi bi-check-circle-fill"></i> Unlimited notes &amp; tasks</div>
+                <div><i class="bi bi-check-circle-fill"></i> Automatic weekly timesheets</div>
+                <div><i class="bi bi-check-circle-fill"></i> AI summaries &amp; reports</div>
+            </div>
+        </div>
+        <div style="color:#94a3b8;font-size:13px">It takes less than a minute.</div>
+    </aside>
+    <main class="auth-main">
+        <div class="auth-card" style="text-align:center">
+            <div style="margin-bottom:8px;font-size:32px"><i class="bi bi-rocket-takeoff" style="color:var(--amber)"></i></div>
+            <h1 style="margin-bottom:6px">Get started free</h1>
+            <p class="muted" style="margin-bottom:28px">No passwords. No credit card. Just Google.</p>
+
+            @if (googleEnabled)
+            {
+                <form asp-action="ExternalLogin" asp-controller="Account" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="provider" value="Google" />
+                    <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+                    <button type="submit" class="btn-google" style="width:100%;justify-content:center;padding:14px 20px;font-size:16px">
+                        <svg width="20" height="20" viewBox="0 0 18 18" aria-hidden="true">
+                            <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908C16.658 14.013 17.64 11.706 17.64 9.2z"/>
+                            <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                            <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                            <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
+                        </svg>
+                        Sign up with Google
+                    </button>
+                </form>
+            }
+            else
+            {
+                <div class="val-err" style="padding:14px;border-radius:10px;text-align:left">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Google Sign-In is not configured yet. Please contact the administrator.
+                </div>
+            }
+
+            <p class="muted" style="margin-top:24px;font-size:13px">
+                Already have an account?
+                <a asp-action="Login" style="color:var(--amber-2);font-weight:600;text-decoration:none">Sign in</a>
+            </p>
+            <p class="muted" style="margin-top:8px;font-size:12px">
+                By continuing you agree to our
+                <a href="/terms" style="color:var(--muted);text-decoration:underline">Terms of Service</a>
+                and <a href="/privacy" style="color:var(--muted);text-decoration:underline">Privacy Policy</a>.
+            </p>
+            <p class="muted" style="margin-top:6px;font-size:12px">
+                <a href="/" style="color:var(--muted)">← Back to home</a>
+            </p>
+        </div>
+    </main>
+</div>

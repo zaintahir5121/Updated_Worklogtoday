@@ -1,0 +1,49 @@
+@model LoginViewModel
+@{
+    ViewData["Title"] = "Sign in · worklog.today";
+    ViewData["Description"] = "Sign in to worklog.today.";
+}
+<div class="auth-wrap">
+    <aside class="auth-aside">
+        <a class="logo" href="/" style="color:#fff"><span class="mark"><i class="bi bi-journal-text"></i></span>worklog<span style="color:var(--amber)">.today</span></a>
+        <div>
+            <h2>Welcome back. Your work, perfectly captured.</h2>
+            <p>Pick up right where you left off — notes, daily tasks, and a timesheet that's already done.</p>
+            <div class="pts">
+                <div><i class="bi bi-check-circle-fill"></i> Keep-style notes board</div>
+                <div><i class="bi bi-check-circle-fill"></i> One-click AI weekly summary</div>
+                <div><i class="bi bi-check-circle-fill"></i> Timesheets ready to submit</div>
+            </div>
+        </div>
+        <div style="color:#94a3b8;font-size:13px">Trusted by professionals who hate timesheet day.</div>
+    </aside>
+    <main class="auth-main">
+        <div class="auth-card">
+            <h1>Sign in</h1>
+            <p class="muted">Enter your details to access your workspace.</p>
+            <form asp-action="Login" asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
+                <div asp-validation-summary="ModelOnly" class="val-err"></div>
+                <div class="field">
+                    <label asp-for="Email"></label>
+                    <input asp-for="Email" class="input" placeholder="you@company.com" autofocus />
+                    <span asp-validation-for="Email" class="val-err"></span>
+                </div>
+                <div class="field">
+                    <label asp-for="Password"></label>
+                    <input asp-for="Password" class="input" placeholder="••••••••" />
+                    <span asp-validation-for="Password" class="val-err"></span>
+                </div>
+                <div class="field" style="display:flex;align-items:center;gap:8px">
+                    <input asp-for="RememberMe" type="checkbox" style="width:16px;height:16px" />
+                    <label asp-for="RememberMe" style="margin:0"></label>
+                </div>
+                <button type="submit" class="btn btn-amber" style="width:100%;justify-content:center"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
+            </form>
+            <p class="muted" style="margin-top:18px;text-align:center">New here? <a asp-action="Register" style="color:var(--amber-2);font-weight:600;text-decoration:none">Create an account</a></p>
+            <div class="demo-box">
+                <i class="bi bi-info-circle"></i> Demo account — <code>demo@worklog.today</code> / <code>Demo#2026</code>
+            </div>
+        </div>
+    </main>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

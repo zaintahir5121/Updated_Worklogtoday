@@ -1,0 +1,33 @@
+@model Note
+<div class="note @(Model.IsPinned ? "pinned" : "")" data-id="@Model.Id" data-color="@Model.ColorHex" data-labels="@(Model.Labels ?? "")" style="background:@Model.ColorHex">
+    <button class="mini-btn pin @(Model.IsPinned ? "on" : "")" type="button" data-act="pin" title="Pin note">
+        <i class="bi @(Model.IsPinned ? "bi-pin-angle-fill" : "bi-pin-angle")"></i>
+    </button>
+    <div class="ntitle-edit" contenteditable="true" data-placeholder="Title" spellcheck="true">@Model.Title</div>
+    <div class="ntext-edit" contenteditable="true" data-placeholder="Add a note…" spellcheck="true">@Model.Content</div>
+    <div class="nlabels">
+        @if (!string.IsNullOrWhiteSpace(Model.Labels))
+        {
+            @foreach (var l in Model.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                <span class="nlabel">@l</span>
+            }
+        }
+    </div>
+    <div class="note-expanded-tools">
+        <div class="note-swatches">
+            @foreach (var c in new[] { "#ffffff","#fff8c5","#d3f9d8","#dbeafe","#fbe4ff","#ffe8cc","#ffd6d6" })
+            {
+                <span class="nsw @(c == Model.ColorHex ? "active" : "")" style="background:@c" data-color="@c"></span>
+            }
+        </div>
+        <input class="nlabels-input" value="@(Model.Labels ?? "")" placeholder="labels…" title="Comma-separated labels" />
+    </div>
+    <div class="nactions">
+        <button class="mini-btn" type="button" data-act="popout" title="Pop out sticky"><i class="bi bi-window-stack"></i></button>
+        <button class="mini-btn" type="button" data-act="extract" title="Extract tasks with AI"><i class="bi bi-list-task"></i></button>
+        <button class="mini-btn" type="button" data-act="archive" title="Archive"><i class="bi bi-archive"></i></button>
+        <button class="mini-btn" type="button" data-act="delete" title="Delete"><i class="bi bi-trash"></i></button>
+        <button class="mini-btn note-close-btn" type="button" data-act="close" title="Close"><i class="bi bi-x-lg"></i></button>
+    </div>
+</div>
